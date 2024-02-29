@@ -1,3 +1,5 @@
 #include "../include/order_book.h"
 
-OrderBook::OrderBook() {securityId(securityId_in), }
+using namespace std;
+
+OrderBook::OrderBook(std::string security_in, unsigned int securityId_in) : security(security_in), securityId(securityId_in) {}

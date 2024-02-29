@@ -39,7 +39,7 @@ class OrderBook {
     LimitPrice* ask;
     LimitPrice* bid;
     
-    OrderBook(std::string security_in, unsigned int securityId_in, unsigned int initial_limitspan);
+    OrderBook(std::string security_in, unsigned int securityId_in);
     bool addLimitOrder(double price_in, double size_in, unsigned int orderId_in, bool buy);
     bool modifyLimitOrder(double price_in, double size_in, unsigned int orderId_in);
     bool cancelLimitOrder(unsigned int orderId_in);
