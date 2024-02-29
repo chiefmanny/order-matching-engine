@@ -5,6 +5,8 @@
 
 using namespace std;
 
+struct LimitPrice; // Forward declaration
+
 enum OrderType {
     Limit,
     Market
