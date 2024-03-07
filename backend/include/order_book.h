@@ -6,8 +6,12 @@
 #include <deque>
 #include <map>
 #include <string>
+#include <random>
+#include <memory>
 
 using namespace std;
+
+struct Order; // Forward declaration
 
 struct LimitPrice {
     const double price;
@@ -16,33 +20,29 @@ struct LimitPrice {
     LimitPrice* parent;
     LimitPrice* towardsMid;
     LimitPrice* awayFromMid;
-    std::deque<Order>* orders;
-};
-
-struct BidFunctor {
-    bool operator()(const LimitPrice& lhs, const LimitPrice& rhs) const {
-        return lhs.price < rhs.price;
-    }
-};
-
-struct AskFunctor {
-    bool operator()(const LimitPrice& lhs, const LimitPrice& rhs) const {
-        return lhs.price > rhs.price;
-    }
+    std::deque<std::shared_ptr<Order>> orders;
 };
 
 class OrderBook {
     const std::string security;
     const unsigned int securityId;
-    std::map<LimitPrice, BidFunctor> askTree;
-    std::map<LimitPrice, AskFunctor> bidTree;
+    std::map<double, LimitPrice> askTree;
+    std::map<double, LimitPrice, std::greater<double>> bidTree;
+    std::unordered_map<unsigned int, std::shared_ptr<Order>> allBuyOrders;
+    std::unordered_map<unsigned int, std::shared_ptr<Order>> allSellOrders;
     LimitPrice* ask;
     LimitPrice* bid;
     
     OrderBook(std::string security_in, unsigned int securityId_in);
-    bool addLimitOrder(double price_in, double size_in, unsigned int orderId_in, bool buy);
-    bool modifyLimitOrder(double price_in, double size_in, unsigned int orderId_in);
+    unsigned int addLimitOrder(double price_in, unsigned int size_in, bool buy); // returns an order_id
+    bool modifyLimitOrder(double price_in, unsigned int size_in, unsigned int orderId_in);
     bool cancelLimitOrder(unsigned int orderId_in);
+    unsigned int generateOrderId();
+
+    static std::random_device rd;
+    static std::mt19937 gen;
+    static std::uniform_int_distribution<unsigned int> distribution;
+    
 };
 
 #endif /* order_book_h */

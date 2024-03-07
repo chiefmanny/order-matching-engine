@@ -20,6 +20,14 @@ struct Order {
     Order* up;
     Order* down;
     LimitPrice* limit;
+    
+    Order(unsigned int orderId_in,
+          unsigned int size_in,
+          OrderType type = OrderType::Limit,
+          double price_in = 0.0,
+          Order* up_in = nullptr,
+          Order* down_in = nullptr,
+          LimitPrice* limit_in = nullptr);
 };
 
 #endif /* order_h */
