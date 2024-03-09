@@ -8,11 +8,14 @@
 #include <iostream>
 #include "backend/include/order_book.h"
 #include "backend/include/order.h"
+#include <thread>
 
-OrderBook book;
+OrderBook book();
 
 int main(int argc, const char * argv[]) {
     // insert code here...
+    unsigned int n = std::thread::hardware_concurrency();
+    std::cout << n << " concurrent threads are supported.\n";
     std::cout << "Hello, World!\n";
     return 0;
 }

@@ -8,12 +8,16 @@
 #include <string>
 #include <random>
 #include <memory>
+#include <thread>
+#include <mutex>
+#include <shared_mutex>
 
 using namespace std;
 
 struct Order; // Forward declaration
 
-struct LimitPrice {
+class LimitPrice {
+public:
     const double price;
     unsigned int numOrders;
     unsigned int volume;
@@ -21,6 +25,9 @@ struct LimitPrice {
     LimitPrice* towardsMid;
     LimitPrice* awayFromMid;
     std::deque<std::shared_ptr<Order>> orders;
+    
+    LimitPrice();
+    LimitPrice(double price_in);
 };
 
 class OrderBook {
@@ -32,12 +39,18 @@ class OrderBook {
     std::unordered_map<unsigned int, std::shared_ptr<Order>> allSellOrders;
     LimitPrice* ask;
     LimitPrice* bid;
+    std::shared_mutex& reader;
+    std::shared_mutex& writer;
     
-    OrderBook(std::string security_in, unsigned int securityId_in);
+    OrderBook(std::string security_in, unsigned int securityId_in, std::shared_mutex& reader_in, std::shared_mutex& writer_in);
     unsigned int addLimitOrder(double price_in, unsigned int size_in, bool buy); // returns an order_id
     bool modifyLimitOrder(double price_in, unsigned int size_in, unsigned int orderId_in);
     bool cancelLimitOrder(unsigned int orderId_in);
     unsigned int generateOrderId();
+    void refreshAsk();
+    void refreshBid();
+    LimitPrice* getAsk();
+    LimitPrice* getBid();
 
     static std::random_device rd;
     static std::mt19937 gen;
