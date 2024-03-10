@@ -7,6 +7,8 @@
 
 #include <stdio.h>
 #include <iostream>
+#include <deque>
+#include <memory>
 #include "../include/matching_algorithm.h"
 
 using namespace std;
@@ -18,8 +20,11 @@ void MatchingAlgorithm::run() {
         {
             std::unique_lock<std::shared_mutex> lockBids(bidMutex);
             std::unique_lock<std::shared_mutex> lockAsks(askMutex);
-            if (orderbook.ask->price <= orderbook.bid->price) {
+            if (orderbook.getAsk() <= orderbook.getBid()) {
                 // Retrieve best ask and bid orders
+                const double ask = orderbook.getAsk();
+                const double bid = orderbook.getBid();
+                
                 LimitPrice* bestAsk = &(orderbook.askTree.begin()->second);
                 LimitPrice* bestBid = &(orderbook.bidTree.begin()->second);
                 
@@ -40,12 +45,14 @@ void MatchingAlgorithm::run() {
                     if (askOrder->size > bidOrder->size) {
                         std::cout << "Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << bidOrder->price << std::endl;
                         askOrder->size -= bidOrder->size;
+                        orderbook.volume += bidOrder->size;
                         bidOrders.pop_front(); // Fully filled
                         //sendTradeNotification(bidOrder);
                         
                     } else if (askOrder->size < bidOrder->size) {
                         std::cout << "Matched order: " << askOrder->orderId << ": ASK " << askOrder->size << " shares at $" << askOrder->price << std::endl;
                         bidOrder->size -= askOrder->size;
+                        orderbook.volume += askOrder->size;
                         askOrders.pop_front(); // Filly filled
                         //sendTradeNotification(askOrder);
                     } else {
@@ -54,17 +61,19 @@ void MatchingAlgorithm::run() {
                         std::cout << "Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << bidOrder->price << std::endl;
                         askOrders.pop_front(); // Filly filled
                         bidOrders.pop_front(); // Fully filled
+                        orderbook.volume += askOrder->size;
+                        orderbook.volume += bidOrder->size;
                         //sendTradeNotification(askOrder);
                         //sendTradeNotification(bidOrder);
                     }
                 }
                 // At this point, one or both LimitPrices have been exhausted, so they should be deleted from the book
                 if (askOrders.empty()) {
-                    orderbook.askTree.erase(bestAsk->price);
+                    orderbook.askTree.erase(ask);
                     orderbook.ask = &(orderbook.askTree.begin()->second); // refreshAsk
                 }
                 if (bidOrders.empty()) {
-                    orderbook.bidTree.erase(bestBid->price);
+                    orderbook.bidTree.erase(bid);
                     orderbook.bid = &(orderbook.bidTree.begin()->second); // refreshBid
                 }
             }
