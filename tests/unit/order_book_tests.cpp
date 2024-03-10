@@ -5,8 +5,9 @@
 //  Created by Manan Manchanda on 3/10/24.
 //
 
-#include <stdio.h>
+#include "unit_tests.h"
 #include "../../backend/include/order_book.h"
+#include <stdio.h>
 #include <shared_mutex>
 #include <mutex>
 #include <cassert>
