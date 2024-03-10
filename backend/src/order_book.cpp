@@ -41,6 +41,7 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
             allBuyOrders.erase(buyIt);
             if (orderDeque.empty()) {
                 bidTree.erase(buyIt->second->price);
+                bid = &(bidTree.begin()->second); // refreshBid
             }
             return true;
         }
@@ -55,6 +56,7 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
             allSellOrders.erase(sellIt);
             if (orderDeque.empty()) {
                 askTree.erase(sellIt->second->price);
+                ask = &(askTree.begin()->second); // refreshAsk
             }
             return true;
         }

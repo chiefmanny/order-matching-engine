@@ -61,9 +61,11 @@ void MatchingAlgorithm::run() {
                 // At this point, one or both LimitPrices have been exhausted, so they should be deleted from the book
                 if (askOrders.empty()) {
                     orderbook.askTree.erase(bestAsk->price);
+                    orderbook.ask = &(orderbook.askTree.begin()->second); // refreshAsk
                 }
                 if (bidOrders.empty()) {
                     orderbook.bidTree.erase(bestBid->price);
+                    orderbook.bid = &(orderbook.bidTree.begin()->second); // refreshBid
                 }
             }
         }
