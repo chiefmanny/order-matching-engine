@@ -99,3 +99,11 @@ void OrderBook::refreshBid() {
     std::shared_lock<std::shared_mutex> lockBuyHash(buyOrdersMutex);
     bid = &(bidTree.begin()->second);
 }
+
+bool OrderBook::askEmpty() {
+    return askTree.empty();
+}
+
+bool OrderBook::bidEmpty() {
+    return bidTree.empty();
+}

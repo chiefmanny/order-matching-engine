@@ -41,6 +41,8 @@ public:
     LimitPrice* getBidWithLock();
     const double getAsk();
     const double getBid();
+    bool askEmpty();
+    bool bidEmpty();
 
     static std::random_device rd;
     static std::mt19937 gen;
