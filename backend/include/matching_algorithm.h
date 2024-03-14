@@ -22,7 +22,7 @@ private:
     
 public:
     MatchingAlgorithm(OrderBook& orderbook_in, std::shared_mutex& askMutex_in, std::shared_mutex& bidMutex_in);
-    void run();
+    void run(bool testFlag);
     
 };
 

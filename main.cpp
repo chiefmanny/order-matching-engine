@@ -21,7 +21,8 @@ int main(int argc, const char * argv[]) {
     std::cout << n << " concurrent threads are supported.\n";
     
     std::cout << "Running tests " << std::endl;
-    test1();
+    //orderbook_basic_test_1();b
+    orderbook_multithread_test_2();
     std::cout << "All tests passed " << std::endl;
     
     return 0;

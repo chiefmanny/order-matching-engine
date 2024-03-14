@@ -15,12 +15,14 @@ using namespace std;
 
 MatchingAlgorithm::MatchingAlgorithm(OrderBook& orderbook_in, std::shared_mutex& askMutex_in, std::shared_mutex& bidMutex_in) : orderbook(orderbook_in), askMutex(askMutex_in), bidMutex(bidMutex_in) {}
 
-void MatchingAlgorithm::run() {
+void MatchingAlgorithm::run(bool testFlag) {
+    int consecutiveIterationsWithoutMatch = 0;
     while (true) {
         {
             std::unique_lock<std::shared_mutex> lockBids(bidMutex);
             std::unique_lock<std::shared_mutex> lockAsks(askMutex);
             if (orderbook.getAsk() <= orderbook.getBid()) {
+                consecutiveIterationsWithoutMatch = 0;
                 // Retrieve best ask and bid orders
                 const double ask = orderbook.getAsk();
                 const double bid = orderbook.getBid();
@@ -43,14 +45,16 @@ void MatchingAlgorithm::run() {
                     
                     // Update partially filled order if necessary
                     if (askOrder->size > bidOrder->size) {
-                        std::cout << "Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << bidOrder->price << std::endl;
+                        std::cout << "          Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << bidOrder->price << std::endl;
+                        std::cout << "Partially matched order: " << askOrder->orderId << ": ASK " << bidOrder->size << " shares at $" << askOrder->price << std::endl;
                         askOrder->size -= bidOrder->size;
                         orderbook.volume += bidOrder->size;
                         bidOrders.pop_front(); // Fully filled
                         //sendTradeNotification(bidOrder);
                         
                     } else if (askOrder->size < bidOrder->size) {
-                        std::cout << "Matched order: " << askOrder->orderId << ": ASK " << askOrder->size << " shares at $" << askOrder->price << std::endl;
+                        std::cout << "          Matched order: " << askOrder->orderId << ": ASK " << askOrder->size << " shares at $" << askOrder->price << std::endl;
+                        std::cout << "Partially matched order: " << bidOrder->orderId << ": ASK " << askOrder->size << " shares at $" << bidOrder->price << std::endl;
                         bidOrder->size -= askOrder->size;
                         orderbook.volume += askOrder->size;
                         askOrders.pop_front(); // Filly filled
@@ -76,6 +80,10 @@ void MatchingAlgorithm::run() {
                     orderbook.bidTree.erase(bid);
                     orderbook.bid = &(orderbook.bidTree.begin()->second); // refreshBid
                 }
+            } else {
+                consecutiveIterationsWithoutMatch++;
+                
+                if (testFlag && consecutiveIterationsWithoutMatch >= 20) return;
             }
         }
         // Sleep for a certain period before checking again (to prevent busy waiting)

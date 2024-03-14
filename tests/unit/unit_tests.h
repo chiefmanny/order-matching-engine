@@ -8,6 +8,10 @@
 #ifndef unit_tests_h
 #define unit_tests_h
 
-void test1();
+void orderbook_basic_test_1();
+
+void orderbook_multithread_test_1();
+
+void orderbook_multithread_test_2();
 
 #endif /* unit_tests_h */
