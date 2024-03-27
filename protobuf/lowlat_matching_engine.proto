@@ -12,7 +12,7 @@ service MatchingEngine {
     
     rpc WatchSymbol(Symbol) returns (stream SymbolData) {} // Streams SymbolData if successful (STATUS::OK), (STATUS::___) if failed
     
-    rpc SubscribeToMyFills(Symbol) returns (stream FillNotification) {} // Streams FillNotifications if successful (STATUS::OK), (STATUS::___) if failed
+    rpc Subscribe(Symbol) returns (stream FillNotification) {} // Streams FillNotifications if successful (STATUS::OK), (STATUS::___) if failed
 }
 
 message Order {
