@@ -23,7 +23,7 @@ public:
     LimitPrice* parent;
     LimitPrice* towardsMid;
     LimitPrice* awayFromMid;
-    std::deque<std::shared_ptr<Order>> orders; // invariant: never empty. If it empties, delete the LimitPrice.
+    std::deque<std::shared_ptr<OrderInternal>> orders; // invariant: never empty. If it empties, delete the LimitPrice.
     //bool hasOrders;                          // can also try to keep a bool in case it speeds up the book.
     LimitPrice();
     LimitPrice(double price_in);

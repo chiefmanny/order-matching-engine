@@ -1,2 +1,0 @@
-# Hashes of file build rules.
-1b4876b2a8656ed644cfe547ef9e4f68 matching_engine.pb.cc

@@ -77,7 +77,7 @@ unsigned int OrderBook::generateOrderId() {
     unsigned int randomNumber;
     do {
         randomNumber = distribution(gen);
-    } while (allBuyOrders.contains(randomNumber) || allSellOrders.contains(randomNumber));
+    } while (allBuyOrders.find(randomNumber) != allBuyOrders.end() || allSellOrders.find(randomNumber) != allSellOrders.end());
 
     return randomNumber;
 }

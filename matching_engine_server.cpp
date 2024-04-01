@@ -7,7 +7,7 @@
 
 #include <stdio.h>
 
-#include "matching_engine.grpc.pb.h"
+#include "build/matching_engine.grpc.pb.h"
 #include "matching_algorithm.h"
 
 #include <algorithm>
@@ -50,16 +50,16 @@ public:
             double price = order->price();
             unsigned int size = order->size();
             bool buy = order->buy();
-            OrderType type = order->limit() ? OrderType:::Limit : OrderType::Market; // not used, all will be limit rn
+            OrderType type = order->limit() ? OrderType::Limit : OrderType::Market; // not used, all will be limit rn
 
             id->set_symbol(symbol);
             id->set_id(book.addLimitOrder(price, size, buy));
 
-            return Status::OK
+            return Status::OK;
         }
-        catch {
+        catch (...) {
             id->set_id(0x00000000);
-            return Status::NOT_FOUND;
+            return grpc::Status(grpc::StatusCode::NOT_FOUND, "error details here");;
         }
     }
     
@@ -70,7 +70,7 @@ public:
 
         id_out->set_id(cancelled ? id : 0x00000000);
 
-        return cancelled ? Status::OK : Status::NOT_FOUND;
+        return cancelled ? Status::OK : grpc::Status(grpc::StatusCode::NOT_FOUND, "error details here");;
     }
     
     Status CheckSymbol(ServerContext* context, const Symbol* symbol, SymbolData* data) override {
@@ -93,10 +93,11 @@ private:
 
 void RunServer() {
     std::string server_address("0.0.0.0:50051");
-    MatchingEngineImpl service();
+    MatchingEngineImpl service;
 
     ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
+    builder.RegisterService(&service);
     std::unique_ptr<Server> server(builder.BuildAndStart());
     std::cout << "Server listening on " << server_address << std::endl;
     server->Wait();

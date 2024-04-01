@@ -5,7 +5,7 @@
 //  Created by Manan Manchanda on 3/31/24.
 //
 
-#include "matching_engine.grpc.pb.h"
+#include "build/matching_engine.grpc.pb.h"
 
 #include <chrono>
 #include <iostream>
@@ -74,7 +74,7 @@ public:
         OrderID id_receive;
         id_send = makeOrderID(symbol, id);
         std::cout << "Client sending cancel order: " << id_send.symbol() << ", " << id_send.id() << std::endl;
-        if (sendCancelOrder(id_send, id_receive)) {
+        if (sendCancelOrder(id_send, &id_receive)) {
             std::cout << "Client received cancel order response: " << id_receive.symbol() << ", " << id_receive.id() << std::endl;
             return true;
         }
@@ -105,7 +105,7 @@ private:
         }
         return true;
     }
-    std::unique_ptr<RouteGuide::Stub> stub_;
+    std::unique_ptr<MatchingEngine::Stub> stub_;
 };
 
 int main(int argc, char** argv) {

@@ -1,7 +1,7 @@
 #ifndef order_book_h
 #define order_book_h
 
-#include "../include/limit_price.h"
+#include "limit_price.h"
 
 #include <deque>
 #include <map>
