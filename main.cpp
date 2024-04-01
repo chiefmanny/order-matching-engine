@@ -10,8 +10,8 @@
 #include <cassert>
 #include <set>
 
-#include "tests/unit/unit_tests.h"
-#include "backend/include/order_book.h"
+#include "unit_tests.h"
+#include "order_book.h"
 
 using namespace std;
 
