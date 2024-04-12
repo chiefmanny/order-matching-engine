@@ -58,7 +58,7 @@ private:
 public:
     MatchingEngineImpl() {
         resources.emplace(std::piecewise_construct,
-                  std::forward_as_tuple("GME"),
+                  std::forward_as_tuple("GME"),     // std::forward_as_tuple: perfect forwarding
                   std::forward_as_tuple("GME", 1));
         resources.emplace(std::piecewise_construct,
                   std::forward_as_tuple("AAPL"),
