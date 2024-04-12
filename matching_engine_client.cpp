@@ -22,32 +22,32 @@
 
 using grpc::Channel;
 using grpc::ClientContext;
-using grpc::ClientReader;
-using grpc::ClientReaderWriter;
-using grpc::ClientWriter;
 using grpc::Status;
 using matchingengine::MatchingEngine;
 using matchingengine::Order;
 using matchingengine::OrderID;
-using matchingengine::FillNotification;
-using matchingengine::RejectedAddOrder;
-using matchingengine::RejectedCancelOrder;
-using matchingengine::Symbol;
-using matchingengine::SymbolData;
-using std::chrono::system_clock;
+using std::chrono::high_resolution_clock;
+using std::chrono::duration_cast;
+using std::chrono::milliseconds;
 
 using namespace std;
 
 class MatchingEngineClient {
 public:
     MatchingEngineClient(const std::string& uri)
-        : stub_(matchingengine::MatchingEngine::NewStub(grpc::CreateChannel(uri, grpc::InsecureChannelCredentials()))) {}
+        : stub_(MatchingEngine::NewStub(grpc::CreateChannel(uri, grpc::InsecureChannelCredentials()))) {}
 
     unsigned int addOrder(const std::string& symbol, double price, unsigned int size, bool buy, bool limit = true) {
-        matchingengine::Order order = makeOrder(symbol, price, size, buy, limit);
-        matchingengine::OrderID orderID;
-        grpc::ClientContext context;
-        grpc::Status status = stub_->AddLimitOrder(&context, order, &orderID);
+        Order order;
+        order.set_symbol(symbol);
+        order.set_price(price);
+        order.set_size(size);
+        order.set_buy(buy);
+        order.set_limit(limit);
+
+        OrderID orderID;
+        ClientContext context;
+        Status status = stub_->AddLimitOrder(&context, order, &orderID);
         if (!status.ok()) {
             std::cerr << "Failed to add order: " << status.error_message() << std::endl;
             return 0;
@@ -57,11 +57,11 @@ public:
     }
 
     bool cancelOrder(const std::string& symbol, unsigned int orderID) {
-        matchingengine::OrderID request;
+        OrderID request;
         request.set_symbol(symbol);
         request.set_id(orderID);
 
-        matchingengine::OrderID response;
+        OrderID response;
         grpc::ClientContext context;
         grpc::Status status = stub_->CancelLimitOrder(&context, request, &response);
         if (!status.ok()) {
@@ -74,23 +74,37 @@ public:
 
 private:
     std::unique_ptr<matchingengine::MatchingEngine::Stub> stub_;
-
-    matchingengine::Order makeOrder(const std::string& symbol, double price, unsigned int size, bool buy, bool limit) {
-        matchingengine::Order order;
-        order.set_symbol(symbol);
-        order.set_price(price);
-        order.set_size(size);
-        order.set_buy(buy);
-        order.set_limit(limit);
-        return order;
-    }
 };
+
+void measureLatency(MatchingEngineClient& client, const std::string& symbol, double price, unsigned int size, bool buy) {
+    auto start = high_resolution_clock::now();
+    unsigned int orderId = client.addOrder(symbol, price, size, buy);
+    auto endAdd = high_resolution_clock::now();
+
+    if (orderId != 0) {
+        client.cancelOrder(symbol, orderId);
+        auto endCancel = high_resolution_clock::now();
+
+        auto addLatency = duration_cast<milliseconds>(endAdd - start).count();
+        auto cancelLatency = duration_cast<milliseconds>(endCancel - endAdd).count();
+        auto totalLatency = duration_cast<milliseconds>(endCancel - start).count();
+
+        std::cout << "Add Order Latency: " << addLatency << " ms\n";
+        std::cout << "Cancel Order Latency: " << cancelLatency << " ms\n";
+        std::cout << "Total Operation Latency: " << totalLatency << " ms\n";
+    }
+}
 
 int main(int argc, char** argv) {
     MatchingEngineClient client("localhost:50051");
-    unsigned int orderID = client.addOrder("GME", 100.0, 10, true);
-    if (orderID != 0) {  // Check if the order was successfully added before attempting to cancel.
-        client.cancelOrder("GME", orderID);
-    }
+
+    // Example of adding and cancelling an order
+    std::string symbol = "GME";
+    double price = 150.0;
+    unsigned int size = 10;
+    bool buy = true;
+
+    measureLatency(client, symbol, price, size, buy);
+
     return 0;
 }
