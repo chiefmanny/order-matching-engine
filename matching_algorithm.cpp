@@ -20,7 +20,7 @@ void MatchingAlgorithm::run(bool testFlag) {
     int consecutiveIterationsWithNoAskOrBid = 0;
     int iterationCount = 0;
     while (true) {
-        if (!orderbook.askEmpty() && !orderbook. bidEmpty()) {
+        if (!orderbook.askEmpty() && !orderbook.bidEmpty()) {
             std::unique_lock<std::shared_mutex> lockBids(bidMutex);
             std::unique_lock<std::shared_mutex> lockAsks(askMutex);
             consecutiveIterationsWithNoAskOrBid = 0;
@@ -83,10 +83,8 @@ void MatchingAlgorithm::run(bool testFlag) {
                     orderbook.bidTree.erase(bid);
                     orderbook.bid = &(orderbook.bidTree.begin()->second); // refreshBid
                 }
-            } else {
-                consecutiveIterationsWithoutMatch++;
-                
-                if (testFlag && consecutiveIterationsWithoutMatch >= 20) return;
+            } else if (testFlag && ++consecutiveIterationsWithoutMatch >= 20) {
+                return;
             }
             if (++iterationCount % 50 == 0) {
                 double bid = orderbook.getBid();

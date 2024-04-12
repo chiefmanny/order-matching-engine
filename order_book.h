@@ -11,6 +11,7 @@
 #include <thread>
 #include <mutex>
 #include <shared_mutex>
+#include <utility>
 
 using namespace std;
 
@@ -35,12 +36,13 @@ public:
     bool modifyLimitOrder(double price_in, unsigned int size_in, unsigned int orderId_in);
     bool cancelLimitOrder(unsigned int orderId_in);
     unsigned int generateOrderId();
-    void refreshAsk();
-    void refreshBid();
-    LimitPrice* getAskWithLock();
-    LimitPrice* getBidWithLock();
+    void refreshAskPointer();
+    void refreshBidPointer();
+    const double getAskWithLock();
+    const double getBidWithLock();
     const double getAsk();
     const double getBid();
+    const std::pair<std::pair<double, unsigned int>, std::pair<double, unsigned int>> getBidSizeAskSizeWithLock();
     bool askEmpty();
     bool bidEmpty();
 

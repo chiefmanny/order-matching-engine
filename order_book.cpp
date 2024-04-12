@@ -90,13 +90,39 @@ const double OrderBook::getBid() {
     return bidTree.begin()->first;
 }
 
-void OrderBook::refreshAsk() {
-    std::shared_lock<std::shared_mutex> lockSellHash(sellOrdersMutex);
+const double OrderBook::getAskWithLock() {
+    std::shared_lock<std::shared_mutex> lockAsks(askMutex);
+    return askTree.begin()->first;
+}
+
+const double OrderBook::getBidWithLock() {
+    std::shared_lock<std::shared_mutex> lockBids(bidMutex);
+    return bidTree.begin()->first;
+}
+
+const std::pair<std::pair<double, unsigned int>, std::pair<double, unsigned int>> OrderBook::getBidSizeAskSizeWithLock() {
+    std::shared_lock<std::shared_mutex> lockAsks(askMutex);
+    std::shared_lock<std::shared_mutex> lockBids(bidMutex);
+
+    if (askTree.empty() || bidTree.empty()) {
+        return {{0.0, 0}, {0.0, 0}};  // Handle empty order books.
+    }
+    
+    auto askIt = askTree.begin();
+    auto bidIt = bidTree.begin();
+
+    std::pair<double, unsigned int> askInfo = {askIt->first, askIt->second.orders.front()->size};
+    std::pair<double, unsigned int> bidInfo = {bidIt->first, bidIt->second.orders.front()->size};
+    return {askInfo, bidInfo};
+}
+
+void OrderBook::refreshAskPointer() {
+    std::shared_lock<std::shared_mutex> lockAsks(askMutex);
     ask = &(askTree.begin()->second);
 }
 
-void OrderBook::refreshBid() {
-    std::shared_lock<std::shared_mutex> lockBuyHash(buyOrdersMutex);
+void OrderBook::refreshBidPointer() {
+    std::shared_lock<std::shared_mutex> lockBids(bidMutex);
     bid = &(bidTree.begin()->second);
 }
 
