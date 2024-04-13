@@ -17,6 +17,8 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <thread>
+#include <atomic>
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server.h>
@@ -43,12 +45,30 @@ using std::chrono::system_clock;
 struct SymbolResources {
     std::shared_mutex askMutex;
     std::shared_mutex bidMutex;
-    OrderBook book;
+    OrderBook orderbook;
     MatchingAlgorithm algo;
+    std::thread algoThread;
+    std::atomic<bool> running{true};
 
-    SymbolResources(const std::string& symbol, int book_id)
-        : book(symbol, book_id, askMutex, bidMutex), 
-          algo(book, askMutex, bidMutex) {}
+    SymbolResources(const std::string& symbol, int orderbook_id)
+        : orderbook(symbol, orderbook_id, askMutex, bidMutex), 
+          algo(orderbook, askMutex, bidMutex) {
+          algoThread = std::thread(&SymbolResources::runAlgorithm, this);
+    }
+    ~SymbolResources() {
+        std::thread::id this_id = std::this_thread::get_id();
+        std::cout << "Thread ID " << this_id << ": Stopping " << orderbook.security << " matching algorithm..." << std::endl;
+        running = false;
+        if (algoThread.joinable()) {
+            algoThread.join();
+        }
+    }
+
+    void runAlgorithm() {
+        std::thread::id this_id = std::this_thread::get_id();
+        std::cout << "Thread ID " << this_id << ": Launching " << orderbook.security << " matching algorithm..." << std::endl;
+        algo.run(running, false);
+    }
 };
 
 class MatchingEngineImpl final : public MatchingEngine::Service {
@@ -81,7 +101,7 @@ public:
             return grpc::Status(grpc::StatusCode::NOT_FOUND, "Symbol not supported");
         }
 
-        unsigned int orderId = it->second.book.addLimitOrder(price, size, buy);
+        unsigned int orderId = it->second.orderbook.addLimitOrder(price, size, buy);
         id->set_symbol(symbol);
         id->set_id(orderId);
 
@@ -99,7 +119,7 @@ public:
             return grpc::Status(grpc::StatusCode::NOT_FOUND, "Symbol not supported");
         }
 
-        bool cancelled = it->second.book.cancelLimitOrder(id);
+        bool cancelled = it->second.orderbook.cancelLimitOrder(id);
 
         id_out->set_id(id);
 
@@ -116,7 +136,7 @@ public:
             return grpc::Status(grpc::StatusCode::NOT_FOUND, "Symbol not supported");
         }
 
-        auto [bid, ask] = it->second.book.getBidSizeAskSizeWithLock();
+        auto [bid, ask] = it->second.orderbook.getBidSizeAskSizeWithLock();
 
         data->set_lastask(ask.first);
         data->set_lastasksize(ask.second);

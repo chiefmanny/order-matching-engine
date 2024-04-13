@@ -9,17 +9,20 @@
 #include <iostream>
 #include <deque>
 #include <memory>
+#include <atomic>
 #include "matching_algorithm.h"
 
 using namespace std;
 
 MatchingAlgorithm::MatchingAlgorithm(OrderBook& orderbook_in, std::shared_mutex& askMutex_in, std::shared_mutex& bidMutex_in) : orderbook(orderbook_in), askMutex(askMutex_in), bidMutex(bidMutex_in) {}
 
-void MatchingAlgorithm::run(bool testFlag) {
+void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
     int consecutiveIterationsWithoutMatch = 0;
     int consecutiveIterationsWithNoAskOrBid = 0;
     int iterationCount = 0;
-    while (true) {
+    std::thread::id this_id = std::this_thread::get_id();
+    std::cout << "Thread ID " << this_id << ": Running " << orderbook.security << " matching algorithm..." << std::endl;
+    while (running) {
         if (!orderbook.askEmpty() && !orderbook.bidEmpty()) {
             std::unique_lock<std::shared_mutex> lockBids(bidMutex);
             std::unique_lock<std::shared_mutex> lockAsks(askMutex);
@@ -96,4 +99,5 @@ void MatchingAlgorithm::run(bool testFlag) {
         // Sleep for a certain period before checking again (to prevent busy waiting)
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
+    std::cout << "Thread ID " << this_id << ": " << orderbook.security << " Matching algorithm halted..." << std::endl;
 }

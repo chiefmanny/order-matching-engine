@@ -97,14 +97,22 @@ void measureLatency(MatchingEngineClient& client, const std::string& symbol, dou
 
 int main(int argc, char** argv) {
     MatchingEngineClient client("localhost:50051");
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::normal_distribution<> priceChange(0.5, 0.2); // small incremental increase with a bit of variance
 
-    // Example of adding and cancelling an order
-    std::string symbol = "GME";
-    double price = 150.0;
-    unsigned int size = 10;
-    bool buy = true;
+    double currentPrice = 150.0; // Starting price
+    for (int i = 0; i < 100000; ++i) {
+        bool buy = i % 2 == 0; // Alternate buy and sell
+        unsigned int size = 100 + (rand() % 100); // Random size between 100 and 200
 
-    measureLatency(client, symbol, price, size, buy);
+        // Adjust price randomly but trend upwards
+        currentPrice += priceChange(gen);
+        client.addOrder("AAPL", currentPrice, size, buy);
+
+        // Simulate time delay between orders
+        std::this_thread::sleep_for(std::chrono::milliseconds(5)); // Half a second between orders
+    }
 
     return 0;
 }
