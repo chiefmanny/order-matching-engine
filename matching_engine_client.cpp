@@ -85,13 +85,13 @@ void measureLatency(MatchingEngineClient& client, const std::string& symbol, dou
         client.cancelOrder(symbol, orderId);
         auto endCancel = high_resolution_clock::now();
 
-        auto addLatency = duration_cast<milliseconds>(endAdd - start).count();
-        auto cancelLatency = duration_cast<milliseconds>(endCancel - endAdd).count();
-        auto totalLatency = duration_cast<milliseconds>(endCancel - start).count();
+        auto addLatency = duration_cast<std::chrono::nanoseconds>(endAdd - start).count();
+        auto cancelLatency = duration_cast<std::chrono::nanoseconds>(endCancel - endAdd).count();
+        auto totalLatency = duration_cast<std::chrono::nanoseconds>(endCancel - start).count();
 
-        std::cout << "Add Order Latency: " << addLatency << " ms\n";
-        std::cout << "Cancel Order Latency: " << cancelLatency << " ms\n";
-        std::cout << "Total Operation Latency: " << totalLatency << " ms\n";
+        std::cout << "Add Order Latency: " << addLatency << " ns\n";
+        std::cout << "Cancel Order Latency: " << cancelLatency << " ns\n";
+        std::cout << "Total Operation Latency: " << totalLatency << " ns\n";
     }
 }
 
