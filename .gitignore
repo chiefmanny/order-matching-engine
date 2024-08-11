@@ -31,4 +31,12 @@
 *.out
 *.app
 
+# Data files
+*.csv
+*.json
+
+# Mac stuff
 *.DS_Store
+
+*env
+*build

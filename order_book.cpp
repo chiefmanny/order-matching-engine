@@ -125,14 +125,26 @@ const std::pair<std::pair<double, unsigned int>, std::pair<double, unsigned int>
     return {askInfo, bidInfo};
 }
 
-void OrderBook::refreshAskPointer() {
-    std::shared_lock<std::shared_mutex> lockAsks(askMutex);
-    ask = &(askTree.begin()->second);
+double OrderBook::refreshAskPointer() {
+    if (!askEmpty()) {
+        ask = &(askTree.begin()->second);
+        return askTree.begin()->first;
+    }
+    else {
+        ask = nullptr;
+        return 0;
+    }
 }
 
-void OrderBook::refreshBidPointer() {
-    std::shared_lock<std::shared_mutex> lockBids(bidMutex);
-    bid = &(bidTree.begin()->second);
+double OrderBook::refreshBidPointer() {
+    if (!bidEmpty()) {
+        bid = &(bidTree.begin()->second);
+        return bidTree.begin()->first;
+    }
+    else {
+        bid = nullptr;
+        return 0;
+    }
 }
 
 bool OrderBook::askEmpty() {

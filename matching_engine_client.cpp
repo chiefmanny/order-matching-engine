@@ -13,6 +13,7 @@
 #include <random>
 #include <string>
 #include <thread>
+#include <fstream>
 
 #include <grpc/grpc.h>
 #include <grpcpp/channel.h>
@@ -72,7 +73,7 @@ public:
         return true;
     }
 
-    void watchSymbol(const std::string& symbol, int watchDurationSeconds) {
+    void watchSymbol(const std::string& symbol, int watchDurationSeconds, bool log = false) {
         std::thread::id this_id = std::this_thread::get_id();
         grpc::ClientContext context;
         matchingengine::Symbol symbolRequest;
@@ -84,15 +85,29 @@ public:
 
         matchingengine::SymbolData data;
         auto startTime = std::chrono::steady_clock::now();
+        std::ofstream outFile;
+
+        if (log) {
+            outFile.open(symbol + "_market_data.csv");
+            outFile << "bid,bidSize,ask,askSize\n";  // CSV header
+        }
 
         while (reader->Read(&data)) {
             // Process the data received from the server
             std::cout << "Thread ID " << this_id << ": " << "Bid: " << data.lastbid() << " Size: " << data.lastbidsize()
-                      << ", Ask: " << data.lastask() << " Size: " << data.lastasksize() << std::endl;
+                    << ", Ask: " << data.lastask() << " Size: " << data.lastasksize() << std::endl;
+
+            // Log the data to a CSV file if log is true
+            if (log) {
+                outFile << data.lastbid() << "," << data.lastbidsize() << ","
+                        << data.lastask() << "," << data.lastasksize() << "\n";
+            }
 
             // Check if the watch duration has elapsed
             auto currentTime = std::chrono::steady_clock::now();
             if (std::chrono::duration_cast<std::chrono::seconds>(currentTime - startTime).count() >= watchDurationSeconds) {
+                // Signal the server to stop sending data
+                context.TryCancel();
                 break;
             }
         }
@@ -103,7 +118,15 @@ public:
         } else {
             std::cout << "Finished watching symbol " << symbol << " for " << watchDurationSeconds << " seconds." << std::endl;
         }
+
+        // Close the file if logging
+        if (log) {
+            outFile.close();
+            std::cout << "Data saved to " << symbol + "_market_data.csv" << std::endl;
+        }
     }
+
+
 
 private:
     std::unique_ptr<matchingengine::MatchingEngine::Stub> stub_;
@@ -128,60 +151,53 @@ void measureLatency(MatchingEngineClient& client, const std::string& symbol, dou
     }
 }
 
+#include <thread>
+
 int main(int argc, char** argv) {
     MatchingEngineClient client("localhost:50051");
 
-    auto marketMakerThread = [&client]() {
-        client.addOrder("AAPL", 151, 35, false);
-        client.addOrder("AAPL", 149, 35, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(10000));
-        client.addOrder("AAPL", 150.9, 35, false);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 149.1, 35, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 149.2, 35, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 150.6, 35, false);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 149.6, 35, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 150.5, 35, false);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 150.47, 35, false);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 150.35, 35, false);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 150.29, 35, false);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 149.65, 35, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 149.85, 35, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 149.95, 35, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 150.03, 35, false);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 149.98, 35, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 149.99, 35, true);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 150.001, 35, false);
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        client.addOrder("AAPL", 160.995, 1000, true);
-        //client.addOrder("AAPL", 149.5, 35, false);
+    // Thread function for buyer
+    auto buyerThread = [&client]() {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::normal_distribution<> priceChange(0.005, 0.002); // small incremental increase with a bit of variance
+        double currentPrice = 150.0; // Starting price
+        for (int i = 0; i < 1000; ++i) {
+            unsigned int size = 100 + (rand() % 100); // Random size between 100 and 200
+            currentPrice += priceChange(gen);
+            client.addOrder("AAPL", currentPrice, size, true); // Buyer thread adds buy orders
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Delay between orders
+        }
     };
 
+    // Thread function for seller
+    auto sellerThread = [&client]() {
+        std::random_device rd;
+        std::mt19937 gen(rd());
+        std::normal_distribution<> priceChange(-0.005, 0.002); // small incremental decrease with a bit of variance
+        double currentPrice = 151.0; // Starting price
+        for (int i = 0; i < 1000; ++i) {
+            unsigned int size = 100 + (rand() % 100); // Random size between 100 and 200
+            currentPrice += priceChange(gen);
+            client.addOrder("AAPL", currentPrice, size, false); // Seller thread adds sell orders
+            std::this_thread::sleep_for(std::chrono::milliseconds(500)); // Delay between orders
+        }
+    };
+
+    // Thread function for watching the symbol after a delay
     auto watchThread = [&client]() {
-        std::this_thread::sleep_for(std::chrono::milliseconds(10)); 
-        client.watchSymbol("AAPL", 1000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10000)); // Wait for about a minute
+        client.watchSymbol("AAPL", 60, true); // Watch the "AAPL" symbol for 10 seconds
     };
 
     // Launch the threads
-    std::thread marketMaker(marketMakerThread);
+    std::thread buyer(buyerThread);
+    std::thread seller(sellerThread);
     std::thread watcher(watchThread);
 
     // Join the threads
-    marketMaker.join();
+    buyer.join();
+    seller.join();
     watcher.join();
 
     return 0;

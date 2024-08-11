@@ -36,8 +36,8 @@ public:
     bool modifyLimitOrder(double price_in, unsigned int size_in, unsigned int orderId_in);
     bool cancelLimitOrder(unsigned int orderId_in);
     unsigned int generateOrderId();
-    void refreshAskPointer();
-    void refreshBidPointer();
+    double refreshAskPointer();
+    double refreshBidPointer();
     const double getAskWithLock();
     const double getBidWithLock();
     const double getAsk();

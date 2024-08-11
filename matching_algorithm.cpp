@@ -85,14 +85,14 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                 if (askOrders.empty()) {
                     std::cout << "Thread ID" << std::this_thread::get_id() << " Old Ask: " << ask << std::endl;
                     orderbook.askTree.erase(ask);
-                    orderbook.ask = &(orderbook.askTree.begin()->second); // refreshAsk
-                    std::cout << "Thread ID" << std::this_thread::get_id() << " New Ask: " << (orderbook.askTree.begin()->first) << std::endl;
+                    double newAsk = orderbook.refreshAskPointer(); // refreshAsk
+                    std::cout << "Thread ID" << std::this_thread::get_id() << " New Ask: " << (newAsk != 0.0 ? std::to_string(newAsk) : "nullptr") << std::endl;
                 }
                 if (bidOrders.empty()) {
                     std::cout << "Thread ID" << std::this_thread::get_id() << " Old Bid: " << bid << std::endl;
                     orderbook.bidTree.erase(bid);
-                    orderbook.bid = &(orderbook.bidTree.begin()->second); // refreshBid
-                    std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (orderbook.bidTree.begin()->first) << std::endl;
+                    double newBid = orderbook.refreshBidPointer();
+                    std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (newBid != 0.0 ? std::to_string(newBid) : "nullptr") << std::endl;
                 }
             } else if (testFlag && ++consecutiveIterationsWithoutMatch >= 20) {
                 return;
@@ -104,6 +104,7 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
             }
         }
         if (testFlag && ++consecutiveIterationsWithNoAskOrBid >= 20) return;
+
         // Sleep for a certain period before checking again (to prevent busy waiting)
         lockBids.unlock();
         lockAsks.unlock();

@@ -78,11 +78,11 @@ private:
 public:
     MatchingEngineImpl() {
         resources.emplace(std::piecewise_construct,
-                  std::forward_as_tuple("GME"),     // std::forward_as_tuple: perfect forwarding
-                  std::forward_as_tuple("GME", 1));
-        resources.emplace(std::piecewise_construct,
-                  std::forward_as_tuple("AAPL"),
-                  std::forward_as_tuple("AAPL", 2));
+                  std::forward_as_tuple("AAPL"),     // std::forward_as_tuple: perfect forwarding
+                  std::forward_as_tuple("AAPL", 1));
+        // resources.emplace(std::piecewise_construct,
+        //           std::forward_as_tuple("GME"),
+        //           std::forward_as_tuple("GME", 2));
 
         // Add more symbols as needed
     }
