@@ -136,7 +136,7 @@ public:
             return grpc::Status(grpc::StatusCode::NOT_FOUND, "Symbol not supported");
         }
 
-        auto [bid, ask] = it->second.orderbook.getBidSizeAskSizeWithLock();
+        auto [ask, bid] = it->second.orderbook.getBidSizeAskSizeWithLock();
 
         data->set_lastask(ask.first);
         data->set_lastasksize(ask.second);
@@ -147,7 +147,42 @@ public:
     }
     
     Status WatchSymbol(ServerContext* context, const Symbol* symbol, ServerWriter<SymbolData>* writer) override {
-        
+         // Extract order details from the client-sent Symbol message
+        std::string symbolToWatch = symbol->symbol();
+
+        std::shared_lock<std::shared_mutex> lock(resources_mutex);
+        auto it = resources.find(symbolToWatch);
+        if (it == resources.end()) {
+            return grpc::Status(grpc::StatusCode::NOT_FOUND, "Symbol not supported");
+        }
+
+        while (true) {
+            // Check if the context has been canceled (e.g., client disconnected)
+            if (context->IsCancelled()) {
+                return grpc::Status::CANCELLED;
+            }
+
+            // Create a new SymbolData message
+            SymbolData data;
+
+            // Fetch the latest bid and ask data
+            auto [ask, bid] = it->second.orderbook.getBidSizeAskSizeWithLock();
+
+            data.set_lastask(ask.first);
+            data.set_lastasksize(ask.second);
+            data.set_lastbid(bid.first);
+            data.set_lastbidsize(bid.second);
+
+            if (!writer->Write(data)) {
+                // If Write fails, the client likely disconnected or canceled
+                return grpc::Status::CANCELLED;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        }
+
+        // This line will never be reached, but it's good practice to include a return statement
+        return grpc::Status::OK;
     }
     
     Status Subscribe(ServerContext* context, const Symbol* symbol, ServerWriter<FillNotification>* writer) override {

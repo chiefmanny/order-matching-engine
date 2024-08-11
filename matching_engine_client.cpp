@@ -72,6 +72,39 @@ public:
         return true;
     }
 
+    void watchSymbol(const std::string& symbol, int watchDurationSeconds) {
+        std::thread::id this_id = std::this_thread::get_id();
+        grpc::ClientContext context;
+        matchingengine::Symbol symbolRequest;
+        symbolRequest.set_symbol(symbol);
+
+        std::unique_ptr<grpc::ClientReader<matchingengine::SymbolData>> reader(
+            stub_->WatchSymbol(&context, symbolRequest)
+        );
+
+        matchingengine::SymbolData data;
+        auto startTime = std::chrono::steady_clock::now();
+
+        while (reader->Read(&data)) {
+            // Process the data received from the server
+            std::cout << "Thread ID " << this_id << ": " << "Bid: " << data.lastbid() << " Size: " << data.lastbidsize()
+                      << ", Ask: " << data.lastask() << " Size: " << data.lastasksize() << std::endl;
+
+            // Check if the watch duration has elapsed
+            auto currentTime = std::chrono::steady_clock::now();
+            if (std::chrono::duration_cast<std::chrono::seconds>(currentTime - startTime).count() >= watchDurationSeconds) {
+                break;
+            }
+        }
+
+        grpc::Status status = reader->Finish();
+        if (!status.ok()) {
+            std::cerr << "WatchSymbol stream ended with error: " << status.error_message() << std::endl;
+        } else {
+            std::cout << "Finished watching symbol " << symbol << " for " << watchDurationSeconds << " seconds." << std::endl;
+        }
+    }
+
 private:
     std::unique_ptr<matchingengine::MatchingEngine::Stub> stub_;
 };
@@ -97,22 +130,59 @@ void measureLatency(MatchingEngineClient& client, const std::string& symbol, dou
 
 int main(int argc, char** argv) {
     MatchingEngineClient client("localhost:50051");
-    std::random_device rd;
-    std::mt19937 gen(rd());
-    std::normal_distribution<> priceChange(0.5, 0.2); // small incremental increase with a bit of variance
 
-    double currentPrice = 150.0; // Starting price
-    for (int i = 0; i < 100000; ++i) {
-        bool buy = i % 2 == 0; // Alternate buy and sell
-        unsigned int size = 100 + (rand() % 100); // Random size between 100 and 200
+    auto marketMakerThread = [&client]() {
+        client.addOrder("AAPL", 151, 35, false);
+        client.addOrder("AAPL", 149, 35, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10000));
+        client.addOrder("AAPL", 150.9, 35, false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 149.1, 35, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 149.2, 35, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 150.6, 35, false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 149.6, 35, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 150.5, 35, false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 150.47, 35, false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 150.35, 35, false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 150.29, 35, false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 149.65, 35, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 149.85, 35, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 149.95, 35, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 150.03, 35, false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 149.98, 35, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 149.99, 35, true);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 150.001, 35, false);
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        client.addOrder("AAPL", 160.995, 1000, true);
+        //client.addOrder("AAPL", 149.5, 35, false);
+    };
 
-        // Adjust price randomly but trend upwards
-        currentPrice += priceChange(gen);
-        client.addOrder("AAPL", currentPrice, size, buy);
+    auto watchThread = [&client]() {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10)); 
+        client.watchSymbol("AAPL", 1000);
+    };
 
-        // Simulate time delay between orders
-        std::this_thread::sleep_for(std::chrono::milliseconds(5)); // Half a second between orders
-    }
+    // Launch the threads
+    std::thread marketMaker(marketMakerThread);
+    std::thread watcher(watchThread);
+
+    // Join the threads
+    marketMaker.join();
+    watcher.join();
 
     return 0;
 }
