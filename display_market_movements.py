@@ -4,12 +4,19 @@ import pandas as pd
 # Load the CSV data
 data = pd.read_csv('AAPL_market_data.csv')
 
+# Calculate the mark price as the average of bid and ask prices
+data['mark'] = (data['bid'] + data['ask']) / 2
+
 # Create a figure and axis objects
 fig, ax1 = plt.subplots()
 
 # Plot the bid and ask lines
 ax1.plot(data['bid'], color='green', label='Bid')
 ax1.plot(data['ask'], color='red', label='Ask')
+
+# Plot the mark price line
+ax1.plot(data['mark'], color='blue', label='Mark')
+
 ax1.set_xlabel('Time (index)')
 ax1.set_ylabel('Price')
 ax1.legend(loc='upper left')
@@ -27,5 +34,5 @@ ax2.set_ylabel('Size')
 ax2.legend(loc='upper right')
 
 # Show the plot
-plt.title('Bid/Ask Prices with Sizes')
+plt.title('Bid/Ask Prices with Mark Price and Sizes')
 plt.show()
