@@ -20,53 +20,62 @@ unsigned int OrderBook::addLimitOrder(double price_in, unsigned int size_in, boo
     std::shared_ptr<OrderInternal> addOrder = std::make_shared<OrderInternal>(id, size_in, OrderType::Limit, price_in, nullptr, nullptr); // pointers unneeded for FIFO
 
     if (buy) {
-        std::scoped_lock lockTreeAndHash(bidMutex, buyOrdersMutex);
-        this->bidTree[price_in].orders.push_back(addOrder);
-        this->bidTree[price_in].totalSize += addOrder->size;
+        auto& limitPrice = this->bidTree[price_in];
+        {
+            std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
+            limitPrice.orders.push_back(addOrder);
+            limitPrice.totalSize += addOrder->size;
+        }
+        std::scoped_lock lockHash(buyOrdersMutex);  // Only lock the hash table for buy orders
         allBuyOrders[id] = addOrder;
     } else {
-        std::scoped_lock lockTreeAndHash(askMutex, sellOrdersMutex);
-        this->askTree[price_in].orders.push_back(addOrder);
-        this->askTree[price_in].totalSize += addOrder->size;
+        auto& limitPrice = this->askTree[price_in];
+        {
+            std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
+            limitPrice.orders.push_back(addOrder);
+            limitPrice.totalSize += addOrder->size;
+        }
+        std::scoped_lock lockHash(sellOrdersMutex);  // Only lock the hash table for sell orders
         allSellOrders[id] = addOrder;
     }
     return id;
 }
 
 
+
 bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for more info from client to reduce server side overhead
     {
-        std::scoped_lock lockTreeAndHash(bidMutex, buyOrdersMutex);
+        std::scoped_lock lockHash(buyOrdersMutex);
         auto buyIt = allBuyOrders.find(orderId_in);
         if (buyIt != allBuyOrders.end()) {
             const double price = buyIt->second->price;
-            auto& limit = bidTree[buyIt->second->price];
-            limit.orders.erase(std::remove(limit.orders.begin(), limit.orders.end(), buyIt->second), limit.orders.end());
-            limit.totalSize -= buyIt->second->size;
+            auto& limitPrice = bidTree[buyIt->second->price];
+            {
+                std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
+                limitPrice.orders.erase(std::remove(limitPrice.orders.begin(), limitPrice.orders.end(), buyIt->second), limitPrice.orders.end());
+                limitPrice.totalSize -= buyIt->second->size;
+            }
             allBuyOrders.erase(buyIt);
-            if (limit.orders.empty()) {
-                std::cout << "Thread ID" << std::this_thread::get_id() << " Old Bid: " << price << std::endl;
+            if (limitPrice.orders.empty()) {
                 bidTree.erase(price);
-                bid = &(bidTree.begin()->second); // refreshBid
-                std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (bidTree.begin()->first) << std::endl;
             }
             return true;
         }
     }
     {
-        std::scoped_lock lockTreeAndHash(askMutex, sellOrdersMutex);
+        std::scoped_lock lockHash(sellOrdersMutex);
         auto sellIt = allSellOrders.find(orderId_in);
         if (sellIt != allSellOrders.end()) {
             const double price = sellIt->second->price;
-            auto& limit = askTree[sellIt->second->price];
-            limit.orders.erase(std::remove(limit.orders.begin(), limit.orders.end(), sellIt->second), limit.orders.end());
-            limit.totalSize -= sellIt->second->size;
+            auto& limitPrice = askTree[sellIt->second->price];
+            {
+                std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
+                limitPrice.orders.erase(std::remove(limitPrice.orders.begin(), limitPrice.orders.end(), sellIt->second), limitPrice.orders.end());
+                limitPrice.totalSize -= sellIt->second->size;
+            }
             allSellOrders.erase(sellIt);
-            if (limit.orders.empty()) {
-                std::cout << "Thread ID" << std::this_thread::get_id() << " Old Ask: " << price << std::endl;
+            if (limitPrice.orders.empty()) {
                 askTree.erase(price);
-                ask = &(askTree.begin()->second); // refreshAsk
-                std::cout << "Thread ID" << std::this_thread::get_id() << " New Ask: " << (askTree.begin()->first) << std::endl;
             }
             return true;
         }

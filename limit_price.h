@@ -27,6 +27,7 @@ public:
     //bool hasOrders;                          // can also try to keep a bool in case it speeds up the book.
     LimitPrice();
     LimitPrice(double price_in);
+    std::mutex mtx;  // New mutex for fine-grained locking
 };
 
 #endif /* limit_price_h */
