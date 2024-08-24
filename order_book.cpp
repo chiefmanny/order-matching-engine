@@ -19,18 +19,20 @@ unsigned int OrderBook::addLimitOrder(double price_in, unsigned int size_in, boo
 
     std::shared_ptr<OrderInternal> addOrder = std::make_shared<OrderInternal>(id, size_in, OrderType::Limit, price_in, nullptr, nullptr); // pointers unneeded for FIFO
 
+    LimitPrice* limitPrice = nullptr;
+
     if (buy) {
         auto it = this->bidTree.find(price_in);
         if (it == this->bidTree.end()) {
             std::scoped_lock lock(bidMutex);  // Acquire the tree lock
-            auto& limitPrice = this->bidTree[price_in];  // Insert the new entry
+            limitPrice = &this->bidTree[price_in];  // Insert the new entry
         } else {
-            auto& limitPrice = it->second;  // Use the existing entry
+            limitPrice = &it->second;  // Use the existing entry
         }
         {
-            std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
-            limitPrice.orders.push_back(addOrder);
-            limitPrice.totalSize += addOrder->size;
+            std::lock_guard<std::mutex> lock(limitPrice->mtx);  // Lock the specific price level
+            limitPrice->orders.push_back(addOrder);
+            limitPrice->totalSize += addOrder->size;
         }
         std::scoped_lock lockHash(buyOrdersMutex);  // Only lock the hash table for buy orders
         allBuyOrders[id] = addOrder;
@@ -38,14 +40,14 @@ unsigned int OrderBook::addLimitOrder(double price_in, unsigned int size_in, boo
         auto it = this->askTree.find(price_in);
         if (it == this->askTree.end()) {
             std::scoped_lock lock(askMutex);  // Acquire the tree lock
-            auto& limitPrice = this->askTree[price_in];  // Insert the new entry
+            limitPrice = &this->askTree[price_in];  // Insert the new entry
         } else {
-            auto& limitPrice = it->second;  // Use the existing entry
+            limitPrice = &it->second;  // Use the existing entry
         }
         {
-            std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
-            limitPrice.orders.push_back(addOrder);
-            limitPrice.totalSize += addOrder->size;
+            std::lock_guard<std::mutex> lock(limitPrice->mtx);  // Lock the specific price level
+            limitPrice->orders.push_back(addOrder);
+            limitPrice->totalSize += addOrder->size;
         }
         std::scoped_lock lockHash(sellOrdersMutex);  // Only lock the hash table for sell orders
         allSellOrders[id] = addOrder;
@@ -61,14 +63,17 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
         auto buyIt = allBuyOrders.find(orderId_in);
         if (buyIt != allBuyOrders.end()) {
             const double price = buyIt->second->price;
-            auto& limitPrice = bidTree[buyIt->second->price];
+            LimitPrice* limitPrice = nullptr;
             {
-                std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
-                limitPrice.orders.erase(std::remove(limitPrice.orders.begin(), limitPrice.orders.end(), buyIt->second), limitPrice.orders.end());
-                limitPrice.totalSize -= buyIt->second->size;
+                limitPrice = &bidTree[buyIt->second->price];
+            }
+            {
+                std::lock_guard<std::mutex> lock(limitPrice->mtx);  // Lock the specific price level
+                limitPrice->orders.erase(std::remove(limitPrice->orders.begin(), limitPrice->orders.end(), buyIt->second), limitPrice->orders.end());
+                limitPrice->totalSize -= buyIt->second->size;
             }
             allBuyOrders.erase(buyIt);
-            if (limitPrice.orders.empty()) {
+            if (limitPrice->orders.empty()) {
                 bidTree.erase(price);
             }
             return true;
@@ -79,14 +84,17 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
         auto sellIt = allSellOrders.find(orderId_in);
         if (sellIt != allSellOrders.end()) {
             const double price = sellIt->second->price;
-            auto& limitPrice = askTree[sellIt->second->price];
+            LimitPrice* limitPrice = nullptr;
             {
-                std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
-                limitPrice.orders.erase(std::remove(limitPrice.orders.begin(), limitPrice.orders.end(), sellIt->second), limitPrice.orders.end());
-                limitPrice.totalSize -= sellIt->second->size;
+                limitPrice = &askTree[sellIt->second->price];
+            }
+            {
+                std::lock_guard<std::mutex> lock(limitPrice->mtx);  // Lock the specific price level
+                limitPrice->orders.erase(std::remove(limitPrice->orders.begin(), limitPrice->orders.end(), sellIt->second), limitPrice->orders.end());
+                limitPrice->totalSize -= sellIt->second->size;
             }
             allSellOrders.erase(sellIt);
-            if (limitPrice.orders.empty()) {
+            if (limitPrice->orders.empty()) {
                 askTree.erase(price);
             }
             return true;
