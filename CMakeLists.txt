@@ -21,14 +21,15 @@ set(me_grpc_srcs "${CMAKE_CURRENT_BINARY_DIR}/matching_engine.grpc.pb.cc")
 set(me_grpc_hdrs "${CMAKE_CURRENT_BINARY_DIR}/matching_engine.grpc.pb.h")
 
 add_custom_command(
-      OUTPUT "${me_proto_srcs}" "${me_proto_hdrs}" "${me_grpc_srcs}" "${me_grpc_hdrs}"
-      COMMAND ${PROTOC_PATH}
-      ARGS --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
+    OUTPUT "${me_proto_srcs}" "${me_proto_hdrs}" "${me_grpc_srcs}" "${me_grpc_hdrs}"
+    COMMAND ${PROTOC_PATH}
+    ARGS --grpc_out "${CMAKE_CURRENT_BINARY_DIR}"
         --cpp_out "${CMAKE_CURRENT_BINARY_DIR}"
         -I "${me_proto_path}"
         --plugin=protoc-gen-grpc="${GRPC_CPP_PLUGIN_PATH}"
         "${me_proto}"
-      DEPENDS "${me_proto}")
+    DEPENDS "${me_proto}"
+)
 
 # Shared source files between client and server
 set(SHARED_SOURCES
@@ -45,9 +46,17 @@ set(SERVER_SOURCES
     matching_engine_server.cpp
 )
 
-# Client specific source
-set(CLIENT_SOURCES
+# Client library source
+set(CLIENT_LIBRARY_SOURCES
     matching_engine_client.cpp
+)
+
+# Create a library for the client interface
+add_library(matching_engine_client_lib STATIC ${CLIENT_LIBRARY_SOURCES} ${SHARED_SOURCES})
+target_link_libraries(matching_engine_client_lib
+    gRPC::grpc++_reflection
+    protobuf::libprotobuf
+    Threads::Threads
 )
 
 # Add executable for server
@@ -58,10 +67,9 @@ target_link_libraries(matching_engine_server
     Threads::Threads
 )
 
-# Add executable for client
-add_executable(matching_engine_client ${CLIENT_SOURCES} ${SHARED_SOURCES})
-target_link_libraries(matching_engine_client
-    gRPC::grpc++_reflection
-    protobuf::libprotobuf
-    Threads::Threads
-)
+# Client executables
+# You can define multiple client executables that link against matching_engine_client_lib
+
+# buyersellerclient
+add_executable(buyersellerclient buyersellerclient.cpp)
+target_link_libraries(buyersellerclient matching_engine_client_lib)
