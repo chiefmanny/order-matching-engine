@@ -1,5 +1,14 @@
 #include "matching_engine_client.h"
 
+#include <chrono>
+#include <iostream>
+#include <memory>
+#include <random>
+#include <string>
+#include <thread>
+#include <fstream>
+#include <condition_variable>
+
 int main(int argc, char** argv) {
     MatchingEngineClient client("localhost:50051");
 
