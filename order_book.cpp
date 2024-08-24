@@ -55,8 +55,6 @@ unsigned int OrderBook::addLimitOrder(double price_in, unsigned int size_in, boo
     return id;
 }
 
-
-
 bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for more info from client to reduce server side overhead
     {
         std::scoped_lock lockHash(buyOrdersMutex);
