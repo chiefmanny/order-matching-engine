@@ -20,7 +20,13 @@ unsigned int OrderBook::addLimitOrder(double price_in, unsigned int size_in, boo
     std::shared_ptr<OrderInternal> addOrder = std::make_shared<OrderInternal>(id, size_in, OrderType::Limit, price_in, nullptr, nullptr); // pointers unneeded for FIFO
 
     if (buy) {
-        auto& limitPrice = this->bidTree[price_in];
+        auto it = this->bidTree.find(price_in);
+        if (it == this->bidTree.end()) {
+            std::scoped_lock lock(bidMutex);  // Acquire the tree lock
+            auto& limitPrice = this->bidTree[price_in];  // Insert the new entry
+        } else {
+            auto& limitPrice = it->second;  // Use the existing entry
+        }
         {
             std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
             limitPrice.orders.push_back(addOrder);
@@ -29,7 +35,13 @@ unsigned int OrderBook::addLimitOrder(double price_in, unsigned int size_in, boo
         std::scoped_lock lockHash(buyOrdersMutex);  // Only lock the hash table for buy orders
         allBuyOrders[id] = addOrder;
     } else {
-        auto& limitPrice = this->askTree[price_in];
+        auto it = this->askTree.find(price_in);
+        if (it == this->askTree.end()) {
+            std::scoped_lock lock(askMutex);  // Acquire the tree lock
+            auto& limitPrice = this->askTree[price_in];  // Insert the new entry
+        } else {
+            auto& limitPrice = it->second;  // Use the existing entry
+        }
         {
             std::lock_guard<std::mutex> lock(limitPrice.mtx);  // Lock the specific price level
             limitPrice.orders.push_back(addOrder);
