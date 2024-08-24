@@ -23,13 +23,19 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
     int iterationCount = 0;
     std::thread::id this_id = std::this_thread::get_id();
     std::cout << "Thread ID " << this_id << ": Running " << orderbook.security << " matching algorithm..." << std::endl;
+    
+    std::shared_lock<std::shared_mutex> lockAsksShared(askMutex, std::defer_lock);
+    std::shared_lock<std::shared_mutex> lockBidsShared(bidMutex, std::defer_lock);
+    std::unique_lock<std::shared_mutex> lockAsksUnique(askMutex, std::defer_lock);
+    std::unique_lock<std::shared_mutex> lockBidsUnique(bidMutex, std::defer_lock);
+    
     while (running) {
-        std::unique_lock<std::shared_mutex> lockBids(bidMutex, std::defer_lock);
-        std::unique_lock<std::shared_mutex> lockAsks(askMutex, std::defer_lock);
+        lockAsksShared.lock();
+        lockBidsShared.lock(); // only reading until this point
 
-        std::lock(lockBids, lockAsks);  // Lock both mutexes simultaneously
         if (!orderbook.askEmpty() && !orderbook.bidEmpty()) {
             consecutiveIterationsWithNoAskOrBid = 0;
+
             if (orderbook.getAsk() <= orderbook.getBid()) {
                 consecutiveIterationsWithoutMatch = 0;
                 
@@ -39,6 +45,12 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                 // Retrieve best ask and bid orders
                 const double ask = orderbook.askTree.begin()->first;
                 const double bid = orderbook.bidTree.begin()->first;
+
+                std::unique_lock<std::mutex> lockAskOrders(bestAsk->mtx);
+                std::unique_lock<std::mutex> lockBidOrders(bestBid->mtx);
+                
+                lockBidsShared.unlock();
+                lockAsksShared.unlock(); // We have traversed the order trees to get the limit objects we need, so we can allow threads to add more orders
                 
                 // Retrieve orders from best ask and bid
                 std::deque<std::shared_ptr<OrderInternal>>& askOrders = bestAsk->orders;
@@ -84,12 +96,16 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                 // At this point, one or both LimitPrices have been exhausted, so they should be deleted from the book
                 if (askOrders.empty()) {
                     std::cout << "Thread ID" << std::this_thread::get_id() << " Old Ask: " << ask << std::endl;
+                    lockAsksUnique.lock();
+                    lockAskOrders.unlock();
                     orderbook.askTree.erase(ask);
                     double newAsk = orderbook.refreshAskPointer(); // refreshAsk
                     std::cout << "Thread ID" << std::this_thread::get_id() << " New Ask: " << (newAsk != 0.0 ? std::to_string(newAsk) : "nullptr") << std::endl;
                 }
                 if (bidOrders.empty()) {
                     std::cout << "Thread ID" << std::this_thread::get_id() << " Old Bid: " << bid << std::endl;
+                    lockBidsUnique.lock();
+                    lockBidOrders.unlock();
                     orderbook.bidTree.erase(bid);
                     double newBid = orderbook.refreshBidPointer();
                     std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (newBid != 0.0 ? std::to_string(newBid) : "nullptr") << std::endl;
@@ -98,16 +114,16 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                 return;
             }
             if (++iterationCount % 10 == 0) {
+                lockAsksShared.lock();
+                lockBidsShared.lock();
                 double bid = orderbook.getBid();
                 double ask = orderbook.getAsk();
                 std::cout << "Thread ID " << this_id << ": " << "Bid: " << bid << ", Ask: " << ask << ", Spread: " << (ask - bid) << std::endl;
+                lockBidsShared.unlock();
+                lockAsksShared.unlock();
             }
         }
         if (testFlag && ++consecutiveIterationsWithNoAskOrBid >= 20) return;
-
-        // Sleep for a certain period before checking again (to prevent busy waiting)
-        lockBids.unlock();
-        lockAsks.unlock();
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
     std::cout << "Thread ID " << this_id << ": " << orderbook.security << " Matching algorithm halted..." << std::endl;
