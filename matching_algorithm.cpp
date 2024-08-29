@@ -53,7 +53,7 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                     std::unique_lock<std::mutex> lockBidOrders(bestBid->mtx);
 
                     // Unlock shared locks early to allow other operations
-                    lockAsksShared.unlock();
+                    lockBidsShared.unlock();
                     lockAsksShared.unlock(); // We have traversed the order trees to get the limit objects we need, so we can allow threads to add more orders
                     
                     // Retrieve orders from best ask and bid
