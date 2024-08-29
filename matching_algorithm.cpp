@@ -40,17 +40,20 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                 if (orderbook.getAsk() <= orderbook.getBid()) {
                     consecutiveIterationsWithoutMatch = 0;
                     
-                    LimitPrice* bestAsk = &(orderbook.askTree.begin()->second);
-                    LimitPrice* bestBid = &(orderbook.bidTree.begin()->second);
+                    auto askIt = orderbook.askTree.begin();
+                    auto bidIt = orderbook.bidTree.begin();
+                    LimitPrice* bestAsk = &(askIt->second);
+                    LimitPrice* bestBid = &(bidIt->second);
 
                     // Retrieve best ask and bid orders
-                    const double ask = orderbook.askTree.begin()->first;
-                    const double bid = orderbook.bidTree.begin()->first;
+                    const double ask = askIt->first;
+                    const double bid = bidIt->first;
 
                     std::unique_lock<std::mutex> lockAskOrders(bestAsk->mtx);
                     std::unique_lock<std::mutex> lockBidOrders(bestBid->mtx);
-                    
-                    lockBidsShared.unlock();
+
+                    // Unlock shared locks early to allow other operations
+                    lockAsksShared.unlock();
                     lockAsksShared.unlock(); // We have traversed the order trees to get the limit objects we need, so we can allow threads to add more orders
                     
                     // Retrieve orders from best ask and bid
@@ -88,7 +91,6 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                             std::cout << "Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << fillPrice << std::endl;
                             askOrders.pop_front(); // Filly filled
                             bidOrders.pop_front(); // Fully filled
-                            orderbook.volume += askOrder->size;
                             orderbook.volume += bidOrder->size;
                             //sendTradeNotification(askOrder);
                             //sendTradeNotification(bidOrder);
