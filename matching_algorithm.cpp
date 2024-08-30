@@ -75,7 +75,6 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                         std::cout << "Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << fillPrice << std::endl;
                         askOrders.pop_front(); // Filly filled
                         bidOrders.pop_front(); // Fully filled
-                        orderbook.volume += askOrder->size;
                         orderbook.volume += bidOrder->size;
                         //sendTradeNotification(askOrder);
                         //sendTradeNotification(bidOrder);
