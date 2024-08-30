@@ -6,6 +6,8 @@ set(GRPC_CPP_PLUGIN_PATH "/Users/mananmanchanda/.local/bin/grpc_cpp_plugin")
 
 set(CMAKE_CXX_STANDARD 17) # Use C++17
 set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -g")
+set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
 
 find_package(Threads REQUIRED)
 find_package(Protobuf CONFIG REQUIRED)
