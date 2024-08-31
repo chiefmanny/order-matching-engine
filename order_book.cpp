@@ -114,13 +114,18 @@ const std::pair<std::pair<double, unsigned int>, std::pair<double, unsigned int>
     auto askIt = askTree.empty() ? askTree.end() : askTree.begin();
     auto bidIt = bidTree.empty() ? bidTree.end() : bidTree.begin();
 
-    std::pair<double, unsigned int> askInfo = (askIt != askTree.end()) 
-        ? std::pair<double, unsigned int>(askIt->first, static_cast<unsigned int>(askIt->second.orders.front()->size)) 
-        : std::pair<double, unsigned int>(0.0, 0);
+    std::pair<double, unsigned int> askInfo = {0.0, 0};
+    std::pair<double, unsigned int> bidInfo = {0.0, 0};
 
-    std::pair<double, unsigned int> bidInfo = (bidIt != bidTree.end()) 
-        ? std::pair<double, unsigned int>(bidIt->first, static_cast<unsigned int>(bidIt->second.orders.front()->size)) 
-        : std::pair<double, unsigned int>(0.0, 0);
+    if (askIt != askTree.end()) {
+        askInfo.first = askIt->first;
+        askInfo.second = askIt->second.orders.empty() ? 0 : static_cast<unsigned int>(askIt->second.orders.front()->size);
+    }
+
+    if (bidIt != bidTree.end()) {
+        bidInfo.first = bidIt->first;
+        bidInfo.second = bidIt->second.orders.empty() ? 0 : static_cast<unsigned int>(bidIt->second.orders.front()->size);
+    }
 
     return {askInfo, bidInfo};
 }
