@@ -84,106 +84,162 @@ unsigned int OrderBook::addLimitOrder(double price_in, unsigned int size_in, boo
 }
 
 
-bool OrderBook::cancelLimitOrder(unsigned int orderId_in) {
-    // First, check if the order exists in the buy orders
+// bool OrderBook::cancelLimitOrder(unsigned int orderId_in) {
+//     // First, check if the order exists in the buy orders
+//     {
+//         std::shared_lock<std::shared_mutex> lockHash(buyOrdersMutex);
+//         auto buyIt = allBuyOrders.find(orderId_in);
+//         if (buyIt != allBuyOrders.end()) {
+//             const double price = buyIt->second->price;
+//             LimitPrice* limitPrice = nullptr;
+
+//             // Lock the bid tree for shared access
+//             {
+//                 std::shared_lock<std::shared_mutex> sharedLock(bidMutex);
+//                 auto it = bidTree.find(price);
+//                 if (it != bidTree.end()) {
+//                     limitPrice = &it->second;
+//                 } else {
+//                     // If not found, it might have already been matched or removed
+//                     // Simply remove from buyOrders and return false
+//                     sharedLock.unlock();
+//                     {
+//                         std::unique_lock<std::shared_mutex> uniqueLock(buyOrdersMutex);
+//                         allBuyOrders.erase(buyIt);
+//                     }
+//                     return false;
+//                 }
+//             }
+
+//             // Lock the specific price level for modification
+//             {
+//                 std::lock_guard<std::mutex> lock(limitPrice->mtx);
+//                 limitPrice->orders.erase(std::remove(limitPrice->orders.begin(), limitPrice->orders.end(), buyIt->second), limitPrice->orders.end());
+//                 limitPrice->totalSize -= buyIt->second->size;
+//             }
+
+//             // Remove the order from the buy orders
+//             {
+//                 std::unique_lock<std::shared_mutex> uniqueLock(buyOrdersMutex);
+//                 allBuyOrders.erase(buyIt);
+//             }
+
+//             // If the price level is empty, remove it from the tree
+//             if (limitPrice->orders.empty()) {
+//                 std::scoped_lock uniqueLock(bidMutex);
+//                 bidTree.erase(price);
+//             }
+
+//             return true;
+//         }
+//     }
+
+//     // If the order wasn't found in buy orders, check the sell orders
+//     {
+//         std::shared_lock<std::shared_mutex> lockHash(sellOrdersMutex);
+//         auto sellIt = allSellOrders.find(orderId_in);
+//         if (sellIt != allSellOrders.end()) {
+//             const double price = sellIt->second->price;
+//             LimitPrice* limitPrice = nullptr;
+
+//             // Lock the ask tree for shared access
+//             {
+//                 std::shared_lock<std::shared_mutex> sharedLock(askMutex);
+//                 auto it = askTree.find(price);
+//                 if (it != askTree.end()) {
+//                     limitPrice = &it->second;
+//                 } else {
+//                     // If not found, it might have already been matched or removed
+//                     // Simply remove from sellOrders and return false
+//                     sharedLock.unlock();
+//                     {
+//                         std::unique_lock<std::shared_mutex> uniqueLock(sellOrdersMutex);
+//                         allSellOrders.erase(sellIt);
+//                     }
+//                     return false;
+//                 }
+//             }
+
+//             // Lock the specific price level for modification
+//             {
+//                 std::lock_guard<std::mutex> lock(limitPrice->mtx);
+//                 limitPrice->orders.erase(std::remove(limitPrice->orders.begin(), limitPrice->orders.end(), sellIt->second), limitPrice->orders.end());
+//                 limitPrice->totalSize -= sellIt->second->size;
+//             }
+
+//             // Remove the order from the sell orders
+//             {
+//                 std::unique_lock<std::shared_mutex> uniqueLock(sellOrdersMutex);
+//                 allSellOrders.erase(sellIt);
+//             }
+
+//             // If the price level is empty, remove it from the tree
+//             if (limitPrice->orders.empty()) {
+//                 std::scoped_lock uniqueLock(askMutex);
+//                 askTree.erase(price);
+//             }
+
+//             return true;
+//         }
+//     }
+
+//     return false;  // Order ID was not found in either buy or sell orders
+// }
+
+bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for more info from client to reduce server side overhead
     {
-        std::shared_lock<std::shared_mutex> lockHash(buyOrdersMutex);
+        std::scoped_lock lockBuyHashUnique(buyOrdersMutex);
         auto buyIt = allBuyOrders.find(orderId_in);
         if (buyIt != allBuyOrders.end()) {
             const double price = buyIt->second->price;
             LimitPrice* limitPrice = nullptr;
-
-            // Lock the bid tree for shared access
             {
-                std::shared_lock<std::shared_mutex> sharedLock(bidMutex);
-                auto it = bidTree.find(price);
-                if (it != bidTree.end()) {
-                    limitPrice = &it->second;
-                } else {
-                    // If not found, it might have already been matched or removed
-                    // Simply remove from buyOrders and return false
-                    sharedLock.unlock();
-                    {
-                        std::unique_lock<std::shared_mutex> uniqueLock(buyOrdersMutex);
-                        allBuyOrders.erase(buyIt);
-                    }
-                    return false;
-                }
+                std::shared_lock<std::shared_mutex> lockBidTreeShared(bidMutex);
+                limitPrice = &bidTree[buyIt->second->price];
             }
-
-            // Lock the specific price level for modification
             {
-                std::lock_guard<std::mutex> lock(limitPrice->mtx);
+                std::unique_lock<std::mutex> limitPriceLock(limitPrice->mtx);  // Lock the specific price level
                 limitPrice->orders.erase(std::remove(limitPrice->orders.begin(), limitPrice->orders.end(), buyIt->second), limitPrice->orders.end());
                 limitPrice->totalSize -= buyIt->second->size;
+                {
+                    std::scoped_lock lockBidTreeUnique(bidMutex);
+                    if (limitPrice->orders.empty()) {
+                        limitPriceLock.unlock();
+                        askTree.erase(price);
+                    }
+                }
             }
-
-            // Remove the order from the buy orders
-            {
-                std::unique_lock<std::shared_mutex> uniqueLock(buyOrdersMutex);
-                allBuyOrders.erase(buyIt);
-            }
-
-            // If the price level is empty, remove it from the tree
-            if (limitPrice->orders.empty()) {
-                std::scoped_lock uniqueLock(bidMutex);
-                bidTree.erase(price);
-            }
-
+            allBuyOrders.erase(buyIt);
             return true;
         }
     }
-
-    // If the order wasn't found in buy orders, check the sell orders
     {
-        std::shared_lock<std::shared_mutex> lockHash(sellOrdersMutex);
+        std::scoped_lock lockSellHashUnique(sellOrdersMutex);
         auto sellIt = allSellOrders.find(orderId_in);
         if (sellIt != allSellOrders.end()) {
             const double price = sellIt->second->price;
             LimitPrice* limitPrice = nullptr;
-
-            // Lock the ask tree for shared access
             {
-                std::shared_lock<std::shared_mutex> sharedLock(askMutex);
-                auto it = askTree.find(price);
-                if (it != askTree.end()) {
-                    limitPrice = &it->second;
-                } else {
-                    // If not found, it might have already been matched or removed
-                    // Simply remove from sellOrders and return false
-                    sharedLock.unlock();
-                    {
-                        std::unique_lock<std::shared_mutex> uniqueLock(sellOrdersMutex);
-                        allSellOrders.erase(sellIt);
-                    }
-                    return false;
-                }
+                std::shared_lock<std::shared_mutex> lockAskTreeShared(askMutex);
+                limitPrice = &askTree[sellIt->second->price];
             }
-
-            // Lock the specific price level for modification
             {
-                std::lock_guard<std::mutex> lock(limitPrice->mtx);
+                std::unique_lock<std::mutex> limitPriceLock(limitPrice->mtx);  // Lock the specific price level
                 limitPrice->orders.erase(std::remove(limitPrice->orders.begin(), limitPrice->orders.end(), sellIt->second), limitPrice->orders.end());
                 limitPrice->totalSize -= sellIt->second->size;
+                {
+                    std::scoped_lock lockAskTreeUnique(askMutex);
+                    if (limitPrice->orders.empty()) {
+                        limitPriceLock.unlock();
+                        askTree.erase(price);
+                    }
+                }
             }
-
-            // Remove the order from the sell orders
-            {
-                std::unique_lock<std::shared_mutex> uniqueLock(sellOrdersMutex);
-                allSellOrders.erase(sellIt);
-            }
-
-            // If the price level is empty, remove it from the tree
-            if (limitPrice->orders.empty()) {
-                std::scoped_lock uniqueLock(askMutex);
-                askTree.erase(price);
-            }
-
+            allSellOrders.erase(sellIt);
             return true;
         }
     }
-
-    return false;  // Order ID was not found in either buy or sell orders
+    return false;
 }
 
 unsigned int OrderBook::generateOrderId() {
