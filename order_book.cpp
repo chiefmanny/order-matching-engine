@@ -206,7 +206,7 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
                     if (limitPrice->orders.empty()) {
                         limitPriceLock.unlock();
                         bidTree.erase(price);
-                        bid = &(bidTree.begin()->second);
+                        refreshBidPointer();
                     }
                 }
             }
@@ -233,7 +233,7 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
                     if (limitPrice->orders.empty()) {
                         limitPriceLock.unlock();
                         askTree.erase(price);
-                        ask = &(askTree.begin()->second);
+                        refreshAskPointer();
                     }
                 }
             }
