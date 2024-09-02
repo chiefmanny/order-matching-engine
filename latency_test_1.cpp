@@ -61,7 +61,7 @@ int main(int argc, char** argv) {
     MatchingEngineClient client("localhost:50051");
 
     const std::string symbol = "AAPL";
-    const int numTests = 100; // Number of latency measurements
+    const int numTests = 10000; // Number of latency measurements
 
     std::cout << "Starting latency tests..." << std::endl;
     runLatencyTests(client, symbol, numTests);
