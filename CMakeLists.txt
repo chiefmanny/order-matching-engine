@@ -6,8 +6,8 @@ set(GRPC_CPP_PLUGIN_PATH "/Users/mananmanchanda/.local/bin/grpc_cpp_plugin")
 
 set(CMAKE_CXX_STANDARD 17) # Use C++17
 set(CMAKE_BUILD_TYPE Debug)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -g")
-set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+# set(CMAKE_LINKER_FLAGS "${CMAKE_LINKER_FLAGS} -fsanitize=address")
 
 find_package(Threads REQUIRED)
 find_package(Protobuf CONFIG REQUIRED)
@@ -84,3 +84,7 @@ target_link_libraries(simpleclient matching_engine_client_lib)
 # benchmark_test_1
 add_executable(benchmark_test_1 benchmark_test_1.cpp)
 target_link_libraries(benchmark_test_1 matching_engine_client_lib)
+
+# latency_test_1
+add_executable(latency_test_1 latency_test_1.cpp)
+target_link_libraries(latency_test_1 matching_engine_client_lib)
