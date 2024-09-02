@@ -127,20 +127,10 @@ void MatchingEngineClient::watchSymbol(const std::string& symbol, int watchDurat
 }
 
 void measureLatency(MatchingEngineClient& client, const std::string& symbol, double price, unsigned int size, bool buy) {
-    auto start = high_resolution_clock::now();
+    auto start = std::chrono::steady_clock::now();
     unsigned int orderId = client.addOrder(symbol, price, size, buy);
-    auto endAdd = high_resolution_clock::now();
+    auto end = std::chrono::steady_clock::now();
 
-    if (orderId != 0) {
-        client.cancelOrder(symbol, orderId);
-        auto endCancel = high_resolution_clock::now();
-
-        auto addLatency = duration_cast<std::chrono::nanoseconds>(endAdd - start).count();
-        auto cancelLatency = duration_cast<std::chrono::nanoseconds>(endCancel - endAdd).count();
-        auto totalLatency = duration_cast<std::chrono::nanoseconds>(endCancel - start).count();
-
-        std::cout << "Add Order Latency: " << addLatency << " ns\n";
-        std::cout << "Cancel Order Latency: " << cancelLatency << " ns\n";
-        std::cout << "Total Operation Latency: " << totalLatency << " ns\n";
-    }
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start).count();
+    std::cout << "Latency: " << duration << " microseconds\n";
 }
