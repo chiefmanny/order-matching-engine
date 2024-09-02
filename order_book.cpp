@@ -205,7 +205,8 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
                     std::scoped_lock lockBidTreeUnique(bidMutex);
                     if (limitPrice->orders.empty()) {
                         limitPriceLock.unlock();
-                        askTree.erase(price);
+                        bidTree.erase(price);
+                        bid = &(bidTree.begin()->second);
                     }
                 }
             }
@@ -232,6 +233,7 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
                     if (limitPrice->orders.empty()) {
                         limitPriceLock.unlock();
                         askTree.erase(price);
+                        ask = &(askTree.begin()->second);
                     }
                 }
             }
