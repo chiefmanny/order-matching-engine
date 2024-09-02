@@ -47,7 +47,7 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
             if (limit.orders.empty()) {
                 std::cout << "Thread ID" << std::this_thread::get_id() << " Old Bid: " << price << std::endl;
                 bidTree.erase(price);
-                bid = &(bidTree.begin()->second); // refreshBid
+                refreshBidPointer(); // refreshBid
                 std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (bidTree.begin()->first) << std::endl;
             }
             return true;
@@ -65,7 +65,7 @@ bool OrderBook::cancelLimitOrder(unsigned int orderId_in) { // could ask for mor
             if (limit.orders.empty()) {
                 std::cout << "Thread ID" << std::this_thread::get_id() << " Old Ask: " << price << std::endl;
                 askTree.erase(price);
-                ask = &(askTree.begin()->second); // refreshAsk
+                refreshAskPointer(); // refreshAsk
                 std::cout << "Thread ID" << std::this_thread::get_id() << " New Ask: " << (askTree.begin()->first) << std::endl;
             }
             return true;
