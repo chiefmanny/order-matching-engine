@@ -88,3 +88,7 @@ target_link_libraries(benchmark_test_1 matching_engine_client_lib)
 # latency_test_1
 add_executable(latency_test_1 latency_test_1.cpp)
 target_link_libraries(latency_test_1 matching_engine_client_lib)
+
+# addlimit_ordering_test
+add_executable(addlimit_ordering_test addlimit_ordering_test.cpp)
+target_link_libraries(addlimit_ordering_test matching_engine_client_lib)
