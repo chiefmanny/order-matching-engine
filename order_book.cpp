@@ -86,11 +86,22 @@ unsigned int OrderBook::generateOrderId() {
 }
 
 const double OrderBook::getAsk() {
-    return askTree.begin()->first;
+    if (!askEmpty()) {
+        return askTree.begin()->first;
+    }
+    else {
+        return 0;
+    }
+        
 }
 
 const double OrderBook::getBid() {
-    return bidTree.begin()->first;
+    if (!bidEmpty()) {
+        return bidTree.begin()->first;
+    }
+    else {
+        return 0;
+    }
 }
 
 const double OrderBook::getAskWithLock() {
