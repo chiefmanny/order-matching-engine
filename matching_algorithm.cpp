@@ -55,38 +55,30 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                 
                 // Iterate through the orders to match
                 while (!bestAsk->orders.empty() && !bestBid->orders.empty() && bestAsk->orders.front()->price <= bestBid->orders.front()->price) {
-                    // Match orders
                     std::shared_ptr<OrderInternal> askOrder = bestAsk->orders.front();
                     std::shared_ptr<OrderInternal> bidOrder = bestBid->orders.front();
                     
-                    // Update order book
-                    // Remove matched orders from order book
                     double fillPrice = (askOrder->price + bidOrder->price) / 2.0;
-                    // Update partially filled order if necessary
+
                     if (askOrder->size > bidOrder->size) {
                         std::cout << "          Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << fillPrice << std::endl;
                         std::cout << "Partially matched order: " << askOrder->orderId << ": ASK " << bidOrder->size << " shares at $" << fillPrice << std::endl;
                         askOrder->size -= bidOrder->size;
                         orderbook.volume += bidOrder->size;
-                        bidOrders.pop_front(); // Fully filled
-                        //sendTradeNotification(bidOrder);
+                        bidOrders.pop_front();
                         
                     } else if (askOrder->size < bidOrder->size) {
                         std::cout << "          Matched order: " << askOrder->orderId << ": ASK " << askOrder->size << " shares at $" << fillPrice << std::endl;
                         std::cout << "Partially matched order: " << bidOrder->orderId << ": ASK " << askOrder->size << " shares at $" << fillPrice << std::endl;
                         bidOrder->size -= askOrder->size;
                         orderbook.volume += askOrder->size;
-                        askOrders.pop_front(); // Filly filled
-                        //sendTradeNotification(askOrder);
+                        askOrders.pop_front();
                     } else {
-                        // Orders are fully matched, so do not need to be added back to the order book
                         std::cout << "Matched order: " << askOrder->orderId << ": ASK " << askOrder->size << " shares at $" << fillPrice << std::endl;
                         std::cout << "Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << fillPrice << std::endl;
-                        askOrders.pop_front(); // Filly filled
-                        bidOrders.pop_front(); // Fully filled
+                        askOrders.pop_front();
+                        bidOrders.pop_front();
                         orderbook.volume += bidOrder->size;
-                        //sendTradeNotification(askOrder);
-                        //sendTradeNotification(bidOrder);
                     }
                 }
                 // At this point, one or both LimitPrices have been exhausted, so they should be deleted from the book
@@ -102,7 +94,7 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                     double newBid = orderbook.refreshBidPointer();
                     std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (newBid != 0.0 ? std::to_string(newBid) : "nullptr") << std::endl;
                 }
-                if (orderbook.askEmpty() && orderbook.bidEmpty()) {
+                if (orderbook.ask == nullptr && orderbook.bid == nullptr && timerStarted) {
                     auto endTime = std::chrono::steady_clock::now();
                     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
                     std::cout << "Matching completed in " << duration << " milliseconds." << std::endl;
