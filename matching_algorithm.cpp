@@ -116,7 +116,7 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                         double newBid = orderbook.refreshBidPointer();
                         std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (newBid != 0.0 ? std::to_string(newBid) : "nullptr") << std::endl;
                     }
-                    if (orderbook.askEmpty() && orderbook.bidEmpty()) {
+                    if (orderbook.ask == nullptr && orderbook.bid == nullptr && timerStarted ) {
                         auto endTime = std::chrono::steady_clock::now();
                         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
                         std::cout << "Matching completed in " << duration << " milliseconds." << std::endl;
