@@ -92,3 +92,7 @@ target_link_libraries(latency_test_1 matching_engine_client_lib)
 # addlimit_ordering_test
 add_executable(addlimit_ordering_test addlimit_ordering_test.cpp)
 target_link_libraries(addlimit_ordering_test matching_engine_client_lib)
+
+# throughput_test_1
+add_executable(throughput_test_1 throughput_test_1.cpp)
+target_link_libraries(throughput_test_1 matching_engine_client_lib)
