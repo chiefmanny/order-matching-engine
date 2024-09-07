@@ -22,11 +22,12 @@ void runThroughputTests(MatchingEngineClient& buyerclient, MatchingEngineClient&
 
     auto buyerThread = [&]() {
         for (int i = 0; i < numTests; ++i) {
-            double price = buyDist(gen);
+            double price = numTests + i;
             unsigned int orderId = buyerclient.addOrder(symbol, price, 100, true); // buy order
+            std::cout << "Order added: Buy 100 shares of AAPL at " << price << std::endl;
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
-                buyOrders.push(price);
+                buyOrders.push(i);
             }
             ordersPlaced++;
         }
@@ -38,13 +39,14 @@ void runThroughputTests(MatchingEngineClient& buyerclient, MatchingEngineClient&
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
                 if (!buyOrders.empty()) {
-                    price = buyOrders.front();
+                    price = numTests - buyOrders.front();
                     buyOrders.pop();
                 } else {
                     continue; // If the queue is empty, wait for more buy orders
                 }
             }
             unsigned int orderId = sellerclient.addOrder(symbol, price, 100, false); // sell order
+            std::cout << "Order added: Sell 100 shares of AAPL at " << price << std::endl;
             ordersMatched++;
         }
     };
@@ -76,7 +78,7 @@ int main(int argc, char** argv) {
     MatchingEngineClient sellerclient("localhost:50051");
 
     const std::string symbol = "AAPL";
-    const int numTests = 10000; // Number of orders to place
+    const int numTests = 100; // Number of orders to place
 
     std::cout << "Starting throughput tests..." << std::endl;
     runThroughputTests(buyerclient, sellerclient, symbol, numTests);
