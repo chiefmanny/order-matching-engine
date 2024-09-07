@@ -24,11 +24,6 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
     std::thread::id this_id = std::this_thread::get_id();
     std::cout << "Thread ID " << this_id << ": Running " << orderbook.security << " matching algorithm..." << std::endl;
     
-    // std::shared_lock<std::shared_mutex> lockAsksShared(askMutex, std::defer_lock);
-    // std::shared_lock<std::shared_mutex> lockBidsShared(bidMutex, std::defer_lock);
-    // std::unique_lock<std::shared_mutex> lockAsksUnique(askMutex, std::defer_lock);
-    // std::unique_lock<std::shared_mutex> lockBidsUnique(bidMutex, std::defer_lock);
-    
     while (running) {
         {
             std::shared_lock<std::shared_mutex> lockAsksShared(askMutex);
