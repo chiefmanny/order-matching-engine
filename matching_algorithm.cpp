@@ -23,12 +23,21 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
     int iterationCount = 0;
     std::thread::id this_id = std::this_thread::get_id();
     std::cout << "Thread ID " << this_id << ": Running " << orderbook.security << " matching algorithm..." << std::endl;
+
+    bool timerStarted = false;
+    auto startTime = std::chrono::steady_clock::time_point();
+
     while (running) {
         std::unique_lock<std::shared_mutex> lockBids(bidMutex, std::defer_lock);
         std::unique_lock<std::shared_mutex> lockAsks(askMutex, std::defer_lock);
 
         std::lock(lockBids, lockAsks);  // Lock both mutexes simultaneously
         if (!orderbook.askEmpty() && !orderbook.bidEmpty()) {
+            if (!timerStarted) {
+                startTime = std::chrono::steady_clock::now();
+                timerStarted = true;
+                std::cout << "Matching timer started..." << std::endl;
+            }
             consecutiveIterationsWithNoAskOrBid = 0;
             if (orderbook.getAsk() <= orderbook.getBid()) {
                 consecutiveIterationsWithoutMatch = 0;
@@ -92,6 +101,12 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                     orderbook.bidTree.erase(bid);
                     double newBid = orderbook.refreshBidPointer();
                     std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (newBid != 0.0 ? std::to_string(newBid) : "nullptr") << std::endl;
+                }
+                if (orderbook.askEmpty() && orderbook.bidEmpty()) {
+                    auto endTime = std::chrono::steady_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+                    std::cout << "Matching completed in " << duration << " milliseconds." << std::endl;
+                    return; // Stop the algorithm since we are done
                 }
             } else if (testFlag && ++consecutiveIterationsWithoutMatch >= 20) {
                 return;
