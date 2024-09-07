@@ -114,7 +114,7 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
         // Sleep for a certain period before checking again (to prevent busy waiting)
         lockBids.unlock();
         lockAsks.unlock();
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     std::cout << "Thread ID " << this_id << ": " << orderbook.security << " Matching algorithm halted..." << std::endl;
 }
