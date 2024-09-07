@@ -24,7 +24,6 @@ void runThroughputTests(MatchingEngineClient& buyerclient, MatchingEngineClient&
         for (int i = 0; i < numTests; ++i) {
             double price = numTests + i;
             unsigned int orderId = buyerclient.addOrder(symbol, price, 100, true); // buy order
-            std::cout << "Order added: Buy 100 shares of AAPL at " << price << std::endl;
             {
                 std::lock_guard<std::mutex> lock(queueMutex);
                 buyOrders.push(i);
@@ -46,7 +45,6 @@ void runThroughputTests(MatchingEngineClient& buyerclient, MatchingEngineClient&
                 }
             }
             unsigned int orderId = sellerclient.addOrder(symbol, price, 100, false); // sell order
-            std::cout << "Order added: Sell 100 shares of AAPL at " << price << std::endl;
             ordersMatched++;
         }
     };
@@ -56,6 +54,8 @@ void runThroughputTests(MatchingEngineClient& buyerclient, MatchingEngineClient&
 
     // Launch buyer thread
     std::thread buyer(buyerThread);
+
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 
     // Launch seller thread
     std::thread seller(sellerThread);
@@ -71,16 +71,23 @@ void runThroughputTests(MatchingEngineClient& buyerclient, MatchingEngineClient&
     std::cout << "Throughput test completed in " << duration << " milliseconds." << std::endl;
     std::cout << "Total Orders Placed: " << ordersPlaced << std::endl;
     std::cout << "Total Orders Matched: " << ordersMatched << std::endl;
+    std::cout << "Test Duration: " << duration << " ms\n"; // Output duration
 }
 
 int main(int argc, char** argv) {
+    if (argc != 2) {
+        std::cerr << "Usage: " << argv[0] << " <numTests>" << std::endl;
+        return 1;
+    }
+
+    int numTests = atoi(argv[1]);
+
     MatchingEngineClient buyerclient("localhost:50051");
     MatchingEngineClient sellerclient("localhost:50051");
 
     const std::string symbol = "AAPL";
-    const int numTests = 100; // Number of orders to place
 
-    std::cout << "Starting throughput tests..." << std::endl;
+    std::cout << "Starting throughput tests with " << numTests << " orders..." << std::endl;
     runThroughputTests(buyerclient, sellerclient, symbol, numTests);
     std::cout << "Throughput tests completed." << std::endl;
 
