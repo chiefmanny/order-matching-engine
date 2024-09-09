@@ -137,7 +137,7 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
             }
         }
         if (testFlag && ++consecutiveIterationsWithNoAskOrBid >= 20) return;
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
     std::cout << "Thread ID " << this_id << ": " << orderbook.security << " Matching algorithm halted..." << std::endl;
 }
