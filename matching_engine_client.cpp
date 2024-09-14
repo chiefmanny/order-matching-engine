@@ -73,7 +73,7 @@ bool MatchingEngineClient::cancelOrder(const std::string& symbol, unsigned int o
     return true;
 }
 
-void MatchingEngineClient::watchSymbol(const std::string& symbol, int watchDurationSeconds, bool log) {
+void MatchingEngineClient::watchSymbol_print(const std::string& symbol, int watchDurationSeconds, bool log) {
     std::thread::id this_id = std::this_thread::get_id();
     grpc::ClientContext context;
     matchingengine::Symbol symbolRequest;
@@ -123,6 +123,46 @@ void MatchingEngineClient::watchSymbol(const std::string& symbol, int watchDurat
     if (log) {
         outFile.close();
         std::cout << "Data saved to " << symbol + "_market_data.csv" << std::endl;
+    }
+}
+
+void MatchingEngineClient::watchSymbol_data(const std::string& symbol, int watchDurationSeconds, 
+                                       std::mutex& dataMutex, std::condition_variable& cv, 
+                                       std::pair<double, double>& bestBidAsk, bool& dataAvailable) {
+    grpc::ClientContext context;
+    matchingengine::Symbol symbolRequest;
+    symbolRequest.set_symbol(symbol);
+
+    std::unique_ptr<grpc::ClientReader<matchingengine::SymbolData>> reader(
+        stub_->WatchSymbol(&context, symbolRequest)
+    );
+
+    matchingengine::SymbolData data;
+    auto startTime = std::chrono::steady_clock::now();
+
+    while (reader->Read(&data)) {
+        {
+            // Lock the mutex to safely update the shared best bid/ask
+            std::lock_guard<std::mutex> lock(dataMutex);
+            bestBidAsk.first = data.lastbid();  // Update the best bid
+            bestBidAsk.second = data.lastask();  // Update the best ask
+            dataAvailable = true;  // Signal that new data is available
+        }
+
+        // Notify the trading threads that new data is available
+        cv.notify_all();
+
+        // Check if the watch duration has elapsed
+        auto currentTime = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(currentTime - startTime).count() >= watchDurationSeconds) {
+            context.TryCancel();
+            break;
+        }
+    }
+
+    grpc::Status status = reader->Finish();
+    if (!status.ok()) {
+        std::cerr << "WatchSymbol stream ended with error: " << status.error_message() << std::endl;
     }
 }
 

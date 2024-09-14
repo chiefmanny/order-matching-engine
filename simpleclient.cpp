@@ -6,7 +6,7 @@ int main(int argc, char** argv) {
     MatchingEngineClient client("localhost:50051");
 
     auto watchThread = [&client]() {
-        client.watchSymbol("AAPL", 60, true);
+        client.watchSymbol_print("AAPL", 60, true);
     };
 
 

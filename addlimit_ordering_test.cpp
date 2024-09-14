@@ -8,7 +8,7 @@ int main(int argc, char** argv) {
     MatchingEngineClient client3("localhost:50051");
 
     auto watchThread = [&client1]() {
-        client1.watchSymbol("AAPL", 60, true);
+        client1.watchSymbol_print("AAPL", 60, true);
     };
 
     auto orderThread = [&client2]() {

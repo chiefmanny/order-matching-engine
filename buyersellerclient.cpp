@@ -71,7 +71,7 @@ int main(int argc, char** argv) {
         });
 
         // Watch the "AAPL" symbol for 3 seconds, and log the results
-        client.watchSymbol("AAPL", 3, true);
+        client.watchSymbol_print("AAPL", 3, true);
     };
 
     // Launch the threads
