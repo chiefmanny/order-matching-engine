@@ -21,7 +21,8 @@ public:
 
     unsigned int addOrder(const std::string& symbol, double price, unsigned int size, bool buy, bool limit = true);
     bool cancelOrder(const std::string& symbol, unsigned int orderID);
-    void watchSymbol(const std::string& symbol, int watchDurationSeconds, bool log = false);
+    void watchSymbol_print(const std::string& symbol, int watchDurationSeconds, bool log = false);
+    void watchSymbol_data(const std::string& symbol, int watchDurationSeconds, std::mutex& dataMutex, std::condition_variable& cv, std::pair<double, double>& bestBidAsk, bool& dataAvailable);
 
 private:
     std::unique_ptr<matchingengine::MatchingEngine::Stub> stub_;
