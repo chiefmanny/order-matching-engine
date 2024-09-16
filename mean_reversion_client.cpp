@@ -20,13 +20,13 @@
 // -l (Spread Limit): Set the maximum allowable spread before tightening in dollars (default: 0.20).
 
 // Constants for default values
-int AVERAGE_ORDER_SIZE = 100;
-double SEED_PRICE = 50.0;
+double SEED_PRICE = 500;
+int AVERAGE_ORDER_SIZE = 500;
 int WATCHER_UPDATE_INTERVAL = 500;  // ms
-int PUSH_INTERVAL = 500;            // ms between orders
-int RUN_TIME = 60;                  // seconds
-double AGGRESSIVENESS_FACTOR = 2.0; // How aggressive orders are when taking liquidity
-double SPREAD_LIMIT = 0.20;         // Max allowable spread
+int PUSH_INTERVAL = 100;            // ms between orders
+int RUN_TIME = 180;                  // seconds
+double AGGRESSIVENESS_FACTOR = 0.2; // How aggressive orders are when taking liquidity
+double SPREAD_LIMIT = 0.50;         // Max allowable spread
 
 // Function to parse command-line arguments
 void parseArguments(int argc, char** argv) {
