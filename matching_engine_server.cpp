@@ -178,7 +178,7 @@ public:
                 return grpc::Status::CANCELLED;
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
 
         // This line will never be reached, but it's good practice to include a return statement
