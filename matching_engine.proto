@@ -14,12 +14,9 @@ service MatchingEngine {
     
     rpc Subscribe(Symbol) returns (stream FillNotification) {} // Streams FillNotifications if successful (STATUS::OK), (STATUS::___) if failed
 
-    rpc GetAskSnapshot(Symbol) returns (stream PriceLevelData) {} // Streams PriceLevelData with a user-requested depth, and returns (STATUS::OK) if successful, (STATUS::___) if failed
-                                                                  // Rank 1 is best ask, 2 is 2nd, 3 is 3rd... etc.  
-    rpc GetBidSnapshot(Symbol) returns (stream PriceLevelData) {} // Streams PriceLevelData with a user-requested depth, and returns (STATUS::OK) if successful, (STATUS::___) if failed
-                                                                  // Rank 1 is best ask, 2 is 2nd, 3 is 3rd... etc.  
-    rpc GetAskAndBidSnapshot(Symbol) returns (stream PriceLevelData) {} // Streams PriceLevelData with a user-requested depth, and returns (STATUS::OK) if successful, (STATUS::___) if failed
-                                                                        // Rank 1 is best bid, -1 is best ask, 2 is 2nd best bid, -2 is second best ask... etc.
+    rpc GetLevel2(Level2Request) returns (stream Level2Response) {} // Single RPC for both bid and ask snapshots, with depth
+
+}
 
 message Order {
     string symbol = 1;
@@ -66,4 +63,22 @@ message PriceLevelData {
     double price = 1;
     int32 size = 2;
     int32 rank = 3;
+}
+
+message Level2Request {
+    string symbol = 1;
+
+    enum Side {
+        BID = 0;
+        ASK = 1;
+        BOTH = 2;
+    }
+
+    Side side = 2;       // Request either bid, ask, or both sides of the order book
+    int32 depth = 3;     // Specify the depth of the snapshot (e.g., top 10 levels)
+}
+
+message Level2Response {
+    repeated PriceLevelData bids = 1;   // A list of price levels for bids
+    repeated PriceLevelData asks = 2;   // A list of price levels for asks
 }
