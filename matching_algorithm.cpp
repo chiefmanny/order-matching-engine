@@ -33,11 +33,11 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
 
         std::lock(lockBids, lockAsks);  // Lock both mutexes simultaneously
         if (!orderbook.askEmpty() && !orderbook.bidEmpty()) {
-            if (!timerStarted) {
-                startTime = std::chrono::steady_clock::now();
-                timerStarted = true;
-                std::cout << "Matching timer started..." << std::endl;
-            }
+            //1 if (!timerStarted) {
+            //1     startTime = std::chrono::steady_clock::now();
+            //1     timerStarted = true;
+            //1     std::cout << "Matching timer started..." << std::endl;
+            //1 }
             consecutiveIterationsWithNoAskOrBid = 0;
             if (orderbook.getAsk() <= orderbook.getBid()) {
                 consecutiveIterationsWithoutMatch = 0;
@@ -94,20 +94,20 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                     double newBid = orderbook.refreshBidPointer();
                     std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (newBid != 0.0 ? std::to_string(newBid) : "nullptr") << std::endl;
                 }
-                if (orderbook.ask == nullptr && orderbook.bid == nullptr && timerStarted) {
-                    auto endTime = std::chrono::steady_clock::now();
-                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-                    std::cout << "Matching completed in " << duration << " milliseconds." << std::endl;
-                    return; // Stop the algorithm since we are done
-                }
+                //1 if (orderbook.ask == nullptr && orderbook.bid == nullptr && timerStarted) {
+                //1     auto endTime = std::chrono::steady_clock::now();
+                //1     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+                //1     std::cout << "Matching completed in " << duration << " milliseconds." << std::endl;
+                //1     return; // Stop the algorithm since we are done
+                //1 }
             } else if (testFlag && ++consecutiveIterationsWithoutMatch >= 20) {
                 return;
             }
-            if (++iterationCount % 10 == 0) {
-                double bid = orderbook.getBid();
-                double ask = orderbook.getAsk();
-                std::cout << "Thread ID " << this_id << ": " << "Bid: " << bid << ", Ask: " << ask << ", Spread: " << (ask - bid) << std::endl;
-            }
+            //1 if (++iterationCount % 10 == 0) {
+            //1     double bid = orderbook.getBid();
+            //1     double ask = orderbook.getAsk();
+            //1     std::cout << "Thread ID " << this_id << ": " << "Bid: " << bid << ", Ask: " << ask << ", Spread: " << (ask - bid) << std::endl;
+            //1 }
         }
         if (testFlag && ++consecutiveIterationsWithNoAskOrBid >= 20) return;
 
