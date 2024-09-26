@@ -13,7 +13,13 @@ service MatchingEngine {
     rpc WatchSymbol(Symbol) returns (stream SymbolData) {} // Streams SymbolData if successful (STATUS::OK), (STATUS::___) if failed
     
     rpc Subscribe(Symbol) returns (stream FillNotification) {} // Streams FillNotifications if successful (STATUS::OK), (STATUS::___) if failed
-}
+
+    rpc GetAskSnapshot(Symbol) returns (stream PriceLevelData) {} // Streams PriceLevelData with a user-requested depth, and returns (STATUS::OK) if successful, (STATUS::___) if failed
+                                                                  // Rank 1 is best ask, 2 is 2nd, 3 is 3rd... etc.  
+    rpc GetBidSnapshot(Symbol) returns (stream PriceLevelData) {} // Streams PriceLevelData with a user-requested depth, and returns (STATUS::OK) if successful, (STATUS::___) if failed
+                                                                  // Rank 1 is best ask, 2 is 2nd, 3 is 3rd... etc.  
+    rpc GetAskAndBidSnapshot(Symbol) returns (stream PriceLevelData) {} // Streams PriceLevelData with a user-requested depth, and returns (STATUS::OK) if successful, (STATUS::___) if failed
+                                                                        // Rank 1 is best bid, -1 is best ask, 2 is 2nd best bid, -2 is second best ask... etc.
 
 message Order {
     string symbol = 1;
@@ -54,4 +60,10 @@ message SymbolData {
     int32 lastAskSize = 2;
     double lastBid = 3;
     int32 lastBidSize = 4;
+}
+
+message PriceLevelData {
+    double price = 1;
+    int32 size = 2;
+    int32 rank = 3;
 }
