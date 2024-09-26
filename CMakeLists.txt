@@ -74,25 +74,33 @@ target_link_libraries(matching_engine_server
 # You can define multiple client executables that link against matching_engine_client_lib
 
 # buyersellerclient
-add_executable(buyersellerclient buyersellerclient.cpp)
-target_link_libraries(buyersellerclient matching_engine_client_lib)
+# add_executable(buyersellerclient buyersellerclient.cpp)
+# target_link_libraries(buyersellerclient matching_engine_client_lib)
 
 # simpleclient
-add_executable(simpleclient simpleclient.cpp)
-target_link_libraries(simpleclient matching_engine_client_lib)
+# add_executable(simpleclient simpleclient.cpp)
+# target_link_libraries(simpleclient matching_engine_client_lib)
 
 # benchmark_test_1
-add_executable(benchmark_test_1 benchmark_test_1.cpp)
-target_link_libraries(benchmark_test_1 matching_engine_client_lib)
+# add_executable(benchmark_test_1 benchmark_test_1.cpp)
+# target_link_libraries(benchmark_test_1 matching_engine_client_lib)
 
 # latency_test_1
-add_executable(latency_test_1 latency_test_1.cpp)
-target_link_libraries(latency_test_1 matching_engine_client_lib)
+# add_executable(latency_test_1 latency_test_1.cpp)
+# target_link_libraries(latency_test_1 matching_engine_client_lib)
 
 # addlimit_ordering_test
-add_executable(addlimit_ordering_test addlimit_ordering_test.cpp)
-target_link_libraries(addlimit_ordering_test matching_engine_client_lib)
+# add_executable(addlimit_ordering_test addlimit_ordering_test.cpp)
+# target_link_libraries(addlimit_ordering_test matching_engine_client_lib)
 
 # throughput_test_1
-add_executable(throughput_test_1 throughput_test_1.cpp)
-target_link_libraries(throughput_test_1 matching_engine_client_lib)
+# add_executable(throughput_test_1 throughput_test_1.cpp)
+# target_link_libraries(throughput_test_1 matching_engine_client_lib)
+
+# mean_reversion_client
+add_executable(mean_reversion_client mean_reversion_client.cpp)
+target_link_libraries(mean_reversion_client matching_engine_client_lib)
+
+# level2fetcher
+add_executable(level2fetcher level2fetcher.cpp)
+target_link_libraries(level2fetcher matching_engine_client_lib)
