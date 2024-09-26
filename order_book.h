@@ -45,6 +45,8 @@ public:
     const std::pair<std::pair<double, unsigned int>, std::pair<double, unsigned int>> getBidSizeAskSizeWithLock();
     bool askEmpty();
     bool bidEmpty();
+    std::vector<std::pair<double, unsigned int>> getTopBidsWithLock(int depth);
+    std::vector<std::pair<double, unsigned int>> getTopAsksWithLock(int depth);
 
     static std::random_device rd;
     static std::mt19937 gen;

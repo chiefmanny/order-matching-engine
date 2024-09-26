@@ -170,3 +170,25 @@ bool OrderBook::askEmpty() {
 bool OrderBook::bidEmpty() {
     return bidTree.empty();
 }
+
+std::vector<std::pair<double, unsigned int>> OrderBook::getTopBidsWithLock(int depth) {
+    std::vector<std::pair<double, unsigned int>> topBids;
+    std::shared_lock<std::shared_mutex> lock(bidMutex);
+
+    for (auto it = bidTree.begin(); it != bidTree.end() && topBids.size() < depth; ++it) {
+        topBids.emplace_back(it->first, it->second.totalSize);
+    }
+
+    return topBids;
+}
+
+std::vector<std::pair<double, unsigned int>> OrderBook::getTopAsksWithLock(int depth) {
+    std::vector<std::pair<double, unsigned int>> topAsks;
+    std::shared_lock<std::shared_mutex> lock(askMutex);
+
+    for (auto it = askTree.begin(); it != askTree.end() && topAsks.size() < depth; ++it) {
+        topAsks.emplace_back(it->first, it->second.totalSize);
+    }
+
+    return topAsks;
+}
