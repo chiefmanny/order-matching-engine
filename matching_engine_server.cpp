@@ -188,6 +188,59 @@ public:
     Status Subscribe(ServerContext* context, const Symbol* symbol, ServerWriter<FillNotification>* writer) override {
         
     }
+
+    Status GetLevel2(ServerContext* context, const matchingengine::Level2Request* request, ServerWriter<matchingengine::Level2Response>* writer) override {
+        // Extract the symbol and request parameters from the client
+        std::string symbol = request->symbol();
+        int depth = request->depth();
+        matchingengine::Level2Request::Side side = request->side();
+
+        // Acquire a shared lock on the resources
+        std::shared_lock<std::shared_mutex> lock(resources_mutex);
+        auto it = resources.find(symbol);
+        if (it == resources.end()) {
+            return grpc::Status(grpc::StatusCode::NOT_FOUND, "Symbol not supported");
+        }
+
+        // Fetch the order book for the symbol
+        auto& orderbook = it->second.orderbook;
+
+        // Create a response object
+        matchingengine::Level2Response response;
+
+        // Fetch bids if requested
+        if (side == matchingengine::Level2Request::BID || side == matchingengine::Level2Request::BOTH) {
+            auto bidLevels = orderbook.getTopBidsWithLock(depth);  // Assume this function returns a vector of price levels
+
+            for (int i = 0; i < bidLevels.size(); ++i) {
+                const auto& [price, totalSize] = bidLevels[i];
+                auto* bidLevel = response.add_bids();  // Add a new PriceLevelData entry
+                bidLevel->set_price(price);
+                bidLevel->set_size(totalSize);
+                bidLevel->set_rank(i + 1);  // Rank starts at 1 for the best bid
+            }
+        }
+
+        // Fetch asks if requested
+        if (side == matchingengine::Level2Request::ASK || side == matchingengine::Level2Request::BOTH) {
+            auto askLevels = orderbook.getTopAsksWithLock(depth);  // Assume this function returns a vector of price levels
+
+            for (int i = 0; i < askLevels.size(); ++i) {
+                const auto& [price, totalSize] = askLevels[i];
+                auto* askLevel = response.add_asks();  // Add a new PriceLevelData entry
+                askLevel->set_price(price);
+                askLevel->set_size(totalSize);
+                askLevel->set_rank(i + 1);  // Rank starts at 1 for the best ask
+            }
+        }
+
+        // Send the response back to the client using the writer
+        if (!writer->Write(response)) {
+            return grpc::Status::CANCELLED;  // Client likely disconnected
+        }
+
+        return grpc::Status::OK;
+    }
 };
 
 void RunServer() {
