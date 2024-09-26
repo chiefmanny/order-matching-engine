@@ -166,6 +166,58 @@ void MatchingEngineClient::watchSymbol_data(const std::string& symbol, int watch
     }
 }
 
+void MatchingEngineClient::getLevel2(const std::string& symbol, int depth, bool log, matchingengine::Level2Request::Side side) {
+    grpc::ClientContext context;
+    matchingengine::Level2Request request;
+    request.set_symbol(symbol);
+    request.set_depth(depth);
+    request.set_side(side);
+
+    std::unique_ptr<grpc::ClientReader<matchingengine::Level2Response>> reader(
+        stub_->GetLevel2(&context, request)
+    );
+
+    matchingengine::Level2Response response;
+    std::ofstream outFile;
+    if (log) {
+        outFile.open(symbol + "_level2_data.csv");
+        outFile << "side,price,size,rank\n";  // CSV header
+    }
+
+    // Read the streamed response
+    while (reader->Read(&response)) {
+        // Process the bids
+        for (const auto& bid : response.bids()) {
+            std::cout << "Bid - Price: " << bid.price() << ", Size: " << bid.size() << ", Rank: " << bid.rank() << std::endl;
+
+            if (log) {
+                outFile << "BID," << bid.price() << "," << bid.size() << "," << bid.rank() << "\n";
+            }
+        }
+
+        // Process the asks
+        for (const auto& ask : response.asks()) {
+            std::cout << "Ask - Price: " << ask.price() << ", Size: " << ask.size() << ", Rank: " << ask.rank() << std::endl;
+
+            if (log) {
+                outFile << "ASK," << ask.price() << "," << ask.size() << "," << ask.rank() << "\n";
+            }
+        }
+    }
+
+    grpc::Status status = reader->Finish();
+    if (!status.ok()) {
+        std::cerr << "GetLevel2 stream ended with error: " << status.error_message() << std::endl;
+    } else {
+        std::cout << "Finished fetching level 2 data for symbol " << symbol << std::endl;
+    }
+
+    if (log) {
+        outFile.close();
+        std::cout << "Level 2 data saved to " << symbol + "_level2_data.csv" << std::endl;
+    }
+}
+
 void measureLatency(MatchingEngineClient& client, const std::string& symbol, double price, unsigned int size, bool buy) {
     auto start = std::chrono::steady_clock::now();
     unsigned int orderId = client.addOrder(symbol, price, size, buy);
