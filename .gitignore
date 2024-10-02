@@ -40,3 +40,8 @@
 
 *env
 *build
+
+*__pycache__
+*pb2*.py
+
+cmake_install.cmake
