@@ -17,7 +17,7 @@ using namespace std;
 
 MatchingAlgorithm::MatchingAlgorithm(OrderBook& orderbook_in, std::shared_mutex& askMutex_in, std::shared_mutex& bidMutex_in) : orderbook(orderbook_in), askMutex(askMutex_in), bidMutex(bidMutex_in) {}
 
-void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
+void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false, bool timerShutoffMode = false) {
     int consecutiveIterationsWithoutMatch = 0;
     int consecutiveIterationsWithNoAskOrBid = 0;
     int iterationCount = 0;
@@ -33,11 +33,11 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
 
         std::lock(lockBids, lockAsks);  // Lock both mutexes simultaneously
         if (!orderbook.askEmpty() && !orderbook.bidEmpty()) {
-            //1 if (!timerStarted) {
-            //1     startTime = std::chrono::steady_clock::now();
-            //1     timerStarted = true;
-            //1     std::cout << "Matching timer started..." << std::endl;
-            //1 }
+            if (timerShutoffMode && !timerStarted) {
+                startTime = std::chrono::steady_clock::now();
+                timerStarted = true;
+                std::cout << "Matching timer started..." << std::endl;
+            }
             consecutiveIterationsWithNoAskOrBid = 0;
             if (orderbook.getAsk() <= orderbook.getBid()) {
                 consecutiveIterationsWithoutMatch = 0;
@@ -94,12 +94,12 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                     double newBid = orderbook.refreshBidPointer();
                     std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (newBid != 0.0 ? std::to_string(newBid) : "nullptr") << std::endl;
                 }
-                //1 if (orderbook.ask == nullptr && orderbook.bid == nullptr && timerStarted) {
-                //1     auto endTime = std::chrono::steady_clock::now();
-                //1     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
-                //1     std::cout << "Matching completed in " << duration << " milliseconds." << std::endl;
-                //1     return; // Stop the algorithm since we are done
-                //1 }
+                if (timerShutoffMode && orderbook.ask == nullptr && orderbook.bid == nullptr && timerStarted) {
+                    auto endTime = std::chrono::steady_clock::now();
+                    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+                    std::cout << "Matching completed in " << duration << " milliseconds." << std::endl;
+                    return; // Stop the algorithm since we are done
+                }
             } else if (testFlag && ++consecutiveIterationsWithoutMatch >= 20) {
                 return;
             }
