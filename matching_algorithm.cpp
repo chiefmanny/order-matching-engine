@@ -17,7 +17,7 @@ using namespace std;
 
 MatchingAlgorithm::MatchingAlgorithm(OrderBook& orderbook_in, std::shared_mutex& askMutex_in, std::shared_mutex& bidMutex_in) : orderbook(orderbook_in), askMutex(askMutex_in), bidMutex(bidMutex_in) {}
 
-void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false, bool timerShutoffMode) {
+void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false, bool timerShutoffMode = false) {
     int consecutiveIterationsWithoutMatch = 0;
     int consecutiveIterationsWithNoAskOrBid = 0;
     int iterationCount = 0;
