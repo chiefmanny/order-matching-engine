@@ -17,7 +17,7 @@ using namespace std;
 
 MatchingAlgorithm::MatchingAlgorithm(OrderBook& orderbook_in, std::shared_mutex& askMutex_in, std::shared_mutex& bidMutex_in) : orderbook(orderbook_in), askMutex(askMutex_in), bidMutex(bidMutex_in) {}
 
-void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
+void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false, bool timerShutoffMode) {
     int consecutiveIterationsWithoutMatch = 0;
     int consecutiveIterationsWithNoAskOrBid = 0;
     int iterationCount = 0;
@@ -36,7 +36,7 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                 consecutiveIterationsWithNoAskOrBid = 0;
 
                 if (orderbook.getAsk() <= orderbook.getBid()) {
-                    if (!timerStarted) {
+                    if (timerShutoffMode && !timerStarted) {
                         startTime = std::chrono::steady_clock::now();
                         timerStarted = true;
                         std::cout << "Matching timer started..." << std::endl;
@@ -116,7 +116,7 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false) {
                         double newBid = orderbook.refreshBidPointer();
                         std::cout << "Thread ID" << std::this_thread::get_id() << " New Bid: " << (newBid != 0.0 ? std::to_string(newBid) : "nullptr") << std::endl;
                     }
-                    if (orderbook.ask == nullptr && orderbook.bid == nullptr && timerStarted ) {
+                    if (timerShutoffMode && orderbook.ask == nullptr && orderbook.bid == nullptr && timerStarted ) {
                         auto endTime = std::chrono::steady_clock::now();
                         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
                         std::cout << "Matching completed in " << duration << " milliseconds." << std::endl;
