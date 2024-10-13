@@ -67,7 +67,7 @@ struct SymbolResources {
     void runAlgorithm() {
         std::thread::id this_id = std::this_thread::get_id();
         std::cout << "Thread ID " << this_id << ": Launching " << orderbook.security << " matching algorithm..." << std::endl;
-        algo.run(running, false);
+        algo.run(running, false, false);
     }
 };
 
