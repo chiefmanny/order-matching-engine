@@ -36,22 +36,22 @@ add_custom_command(
 
 # Shared source files between client and server
 set(SHARED_SOURCES
-    order.cpp
-    limit_price.cpp
-    order_book.cpp
-    matching_algorithm.cpp
+    src/core/order.cpp
+    src/core/limit_price.cpp
+    src/core/order_book.cpp
+    src/core/matching_algorithm.cpp
     ${me_proto_srcs}
     ${me_grpc_srcs}
 )
 
 # Server specific source
 set(SERVER_SOURCES
-    matching_engine_server.cpp
+    src/grpc/matching_engine_server.cpp
 )
 
 # Client library source
 set(CLIENT_LIBRARY_SOURCES
-    matching_engine_client.cpp
+    src/grpc/matching_engine_client.cpp
 )
 
 # Create a library for the client interface
@@ -74,33 +74,33 @@ target_link_libraries(matching_engine_server
 # You can define multiple client executables that link against matching_engine_client_lib
 
 # buyersellerclient
-# add_executable(buyersellerclient buyersellerclient.cpp)
+# add_executable(buyersellerclient src/clients/buyersellerclient.cpp)
 # target_link_libraries(buyersellerclient matching_engine_client_lib)
 
 # simpleclient
-# add_executable(simpleclient simpleclient.cpp)
+# add_executable(simpleclient src/clients/simpleclient.cpp)
 # target_link_libraries(simpleclient matching_engine_client_lib)
 
 # benchmark_test_1
-# add_executable(benchmark_test_1 benchmark_test_1.cpp)
+# add_executable(benchmark_test_1 src/clients/benchmark_test_1.cpp)
 # target_link_libraries(benchmark_test_1 matching_engine_client_lib)
 
 # latency_test_1
-# add_executable(latency_test_1 latency_test_1.cpp)
+# add_executable(latency_test_1 src/clients/latency_test_1.cpp)
 # target_link_libraries(latency_test_1 matching_engine_client_lib)
 
 # addlimit_ordering_test
-# add_executable(addlimit_ordering_test addlimit_ordering_test.cpp)
+# add_executable(addlimit_ordering_test src/clients/addlimit_ordering_test.cpp)
 # target_link_libraries(addlimit_ordering_test matching_engine_client_lib)
 
 # throughput_test_1
-# add_executable(throughput_test_1 throughput_test_1.cpp)
+# add_executable(throughput_test_1 src/clients/throughput_test_1.cpp)
 # target_link_libraries(throughput_test_1 matching_engine_client_lib)
 
 # mean_reversion_client
-add_executable(mean_reversion_client mean_reversion_client.cpp)
+add_executable(mean_reversion_client src/clients/mean_reversion_client.cpp)
 target_link_libraries(mean_reversion_client matching_engine_client_lib)
 
 # level2fetcher
-add_executable(level2fetcher level2fetcher.cpp)
+add_executable(level2fetcher src/clients/level2fetcher.cpp)
 target_link_libraries(level2fetcher matching_engine_client_lib)

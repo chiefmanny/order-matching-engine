@@ -5,8 +5,8 @@
 //  Created by Manan Manchanda on 3/31/24.
 //
 
-#include "build/matching_engine.grpc.pb.h"
-#include "matching_algorithm.h"
+#include "../../build/matching_engine.grpc.pb.h"
+#include "../core/matching_algorithm.h"
 
 #include <algorithm>
 #include <stdio.h>
