@@ -21,45 +21,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Mount the static directory to serve the candlestick chart image
-app.mount("/static", StaticFiles(directory="static"), name="static")
-
-# WebSocket route for pushing chart updates to the client
-@app.websocket("/ws/chart")
-async def websocket_endpoint(websocket: WebSocket):
-    await websocket.accept()
-    try:
-        while True:
-            # When the chart is updated, send the new chart URL to the client
-            if os.path.exists("static/live_candlestick.png"):
-                await websocket.send_json({"chartUrl": "/static/live_candlestick.png"})
-            await asyncio.sleep(1)  # Adjust based on how often the chart changes
-    except WebSocketDisconnect:
-        print("Client disconnected")
-
-# Generate the candlestick chart every few seconds
+# Global variable for candlestick chart (shared between WebSocket and chart generation)
 candlestick_chart = None
+candle_size = 1
 
 @app.on_event("startup")
 async def start_watcher():
     global candlestick_chart
     # Start watching the symbol (e.g., "AAPL") with 1-second candles
-    candlestick_chart = subscribe_to_price("AAPL", 1)
-    
-    def generate_chart():
+    candlestick_chart = subscribe_to_price("AAPL", candle_size)
+
+# WebSocket route for pushing live candlestick data
+@app.websocket("/ws/chart")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
+    try:
         while True:
-            candlestick_chart.save_chart("static/live_candlestick.png")
-            time.sleep(1)  # Adjust this to control the chart generation frequency
-    
-    thread = threading.Thread(target=generate_chart)
-    thread.start()
+            if candlestick_chart:
+                latest_candle = candlestick_chart.get_latest_candle()
+                if latest_candle:
+                    await websocket.send_json(latest_candle)
+            await asyncio.sleep(candle_size)  # Adjust the frequency of updates as necessary
+    except WebSocketDisconnect:
+        print("Client disconnected")
 
 # gRPC connection setup
 def get_grpc_stub():
     channel = grpc.insecure_channel("localhost:50051")
     stub = pb2_grpc.MatchingEngineStub(channel)
     return stub
-
 
 # Get level 2 data for a symbol
 @app.get("/get-level2-data")

@@ -3,9 +3,6 @@ import matching_engine_pb2
 import matching_engine_pb2_grpc
 import time
 import threading
-import matplotlib
-matplotlib.use('Agg')  # Use non-interactive Agg backend
-import matplotlib.pyplot as plt
 from datetime import datetime
 from collections import deque
 
@@ -33,25 +30,18 @@ class CandlestickChart:
             self.start_time = current_time
         self.price_data.append(price)
 
-    def save_chart(self, filepath="static/live_candlestick.png"):
-        fig, ax = plt.subplots()
-        times = list(range(len(self.candles)))
-        opens = [c[0] for c in self.candles]
-        highs = [c[1] for c in self.candles]
-        lows = [c[2] for c in self.candles]
-        closes = [c[3] for c in self.candles]
-
-        for i in range(len(self.candles)):
-            color = 'g' if closes[i] >= opens[i] else 'r'
-            ax.plot([times[i], times[i]], [lows[i], highs[i]], color=color)  # Wick
-            ax.plot([times[i]], [opens[i]], marker='_', color=color)  # Open
-            ax.plot([times[i]], [closes[i]], marker='_', color=color)  # Close
-
-        ax.set_title(f"Live Candlestick Chart for {self.symbol}")
-        ax.set_xlabel("Time")
-        ax.set_ylabel("Price")
-        plt.savefig(filepath)
-        plt.close()
+    def get_latest_candle(self):
+        """Returns the latest candlestick data: open, high, low, close"""
+        if self.candles:
+            return {
+                "time": datetime.utcnow().isoformat(),
+                "open": self.candles[-1][0],
+                "high": self.candles[-1][1],
+                "low": self.candles[-1][2],
+                "close": self.candles[-1][3]
+            }
+        else:
+            return None
 
 def subscribe_to_price(symbol, candle_size_seconds):
     channel = grpc.insecure_channel("localhost:50051")

@@ -44,29 +44,35 @@ h1 {
 
 .container {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  align-items: flex-start;
-  margin-top: 20px;
 }
 
 .chart {
-  margin-right: 50px;
+  margin-bottom: 20px;
+  width: 100%;
 }
 
 .level2-data {
   display: flex;
-  flex-direction: row;
+  justify-content: space-around;
+  width: 90%;
+}
+
+.bids-asks {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
 }
 
 .bids, .asks {
-  margin-bottom: 20px;
-  margin-left: 20px;
-  margin-right: 20px;
+  width: 45%;
 }
 
 table {
+  width: 100%;
   border-collapse: collapse;
-  width: 200px;
 }
 
 th, td {
@@ -77,9 +83,8 @@ th, td {
 
 th {
   background-color: #f2f2f2;
-  color: black;
 }
 
-tr:hover {
-  background-color: #f1f1f1;
+tr:nth-child(even) {
+  background-color: #f9f9f9;
 }
