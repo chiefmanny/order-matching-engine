@@ -1,0 +1,30 @@
+services:
+  cpp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.cpp
+    expose:
+      - "50051"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    expose:
+      - "8000"
+    environment:
+      GRPC_SERVER_HOST: cpp-server
+    depends_on:
+      - cpp-server
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

@@ -1,0 +1,30 @@
+# syntax=docker/dockerfile:1
+
+# ── Stage 1: build React app ─────────────────────────────────────────────────
+FROM node:20-alpine AS builder
+
+WORKDIR /app
+
+# Install deps before copying source so this layer is cached on source-only changes
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm install --legacy-peer-deps
+
+COPY frontend/ .
+
+# CRA bakes REACT_APP_* vars into the static bundle at build time.
+# Override at `docker build` time with --build-arg if deploying to a domain
+# other than localhost (e.g. --build-arg REACT_APP_API_HTTP_URL=https://example.com).
+ARG REACT_APP_API_HTTP_URL=http://localhost
+ARG REACT_APP_API_WS_URL=ws://localhost
+
+RUN REACT_APP_API_HTTP_URL=$REACT_APP_API_HTTP_URL \
+    REACT_APP_API_WS_URL=$REACT_APP_API_WS_URL \
+    npm run build
+
+# ── Stage 2: nginx ───────────────────────────────────────────────────────────
+FROM nginx:alpine AS runtime
+
+COPY --from=builder /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+EXPOSE 80

@@ -1,0 +1,20 @@
+.git
+.gitignore
+
+# C++ build artifacts
+build/
+*.o
+*.a
+
+# Node
+frontend/node_modules/
+frontend/build/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+backend/__pycache__/
+
+# macOS
+.DS_Store

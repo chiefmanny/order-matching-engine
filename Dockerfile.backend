@@ -1,0 +1,37 @@
+# syntax=docker/dockerfile:1
+
+# ── Stage 1: generate Python gRPC stubs ─────────────────────────────────────
+FROM python:3.11-slim AS proto-gen
+
+# Install grpcio-tools at the same version constraint as the runtime so the
+# generated stub API matches what grpcio will provide at runtime.
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir "$(grep grpcio-tools requirements.txt)"
+
+WORKDIR /proto
+COPY matching_engine.proto .
+
+RUN python -m grpc_tools.protoc \
+    -I. \
+    --python_out=. \
+    --grpc_python_out=. \
+    matching_engine.proto
+
+# ── Stage 2: runtime ─────────────────────────────────────────────────────────
+FROM python:3.11-slim AS runtime
+
+WORKDIR /app
+
+# Install deps before copying source so this layer is cached on source-only changes
+COPY backend/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy backend source, then overlay the generated stubs
+COPY backend/ .
+COPY --from=proto-gen /proto/matching_engine_pb2.py .
+COPY --from=proto-gen /proto/matching_engine_pb2_grpc.py .
+
+ENV GRPC_SERVER_HOST=cpp-server
+
+EXPOSE 8000
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"]
