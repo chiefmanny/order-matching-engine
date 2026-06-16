@@ -1,6 +1,5 @@
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 import os
 import asyncio
@@ -10,6 +9,8 @@ import grpc
 import matching_engine_pb2 as pb2
 import matching_engine_pb2_grpc as pb2_grpc
 from live_candlestick import subscribe_to_price
+
+GRPC_TARGET = os.environ.get("GRPC_SERVER_HOST", "localhost") + ":50051"
 
 app = FastAPI()
 
@@ -47,7 +48,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # gRPC connection setup
 def get_grpc_stub():
-    channel = grpc.insecure_channel("localhost:50051")
+    channel = grpc.insecure_channel(GRPC_TARGET)
     stub = pb2_grpc.MatchingEngineStub(channel)
     return stub
 

@@ -13,14 +13,17 @@ function App() {
   const [level2Data, setLevel2Data] = useState({ bids: [], asks: [] });
 
   useEffect(() => {
+    const apiBase = process.env.REACT_APP_API_HTTP_URL || 'http://localhost:8000';
+    const wsBase = process.env.REACT_APP_API_WS_URL || 'ws://localhost:8000';
+
     const fetchLevel2Data = () => {
-      fetch('http://localhost:8000/get-level2-data?symbol=AAPL&depth=10')
+      fetch(`${apiBase}/get-level2-data?symbol=AAPL&depth=10`)
         .then((response) => response.json())
         .then((data) => setLevel2Data(data))
         .catch((error) => console.error('Error fetching Level 2 data:', error));
     };
 
-    const socket = new WebSocket('ws://localhost:8000/ws/chart');
+    const socket = new WebSocket(`${wsBase}/ws/chart`);
 
     socket.onmessage = function (event) {
       const data = JSON.parse(event.data);

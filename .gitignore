@@ -31,9 +31,11 @@
 *.out
 *.app
 
-# Data files
+# Data files (benchmark output, market data exports)
 *.csv
 *.json
+!frontend/package.json
+!frontend/package-lock.json
 
 # Mac stuff
 *.DS_Store

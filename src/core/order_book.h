@@ -5,6 +5,7 @@
 
 #include <deque>
 #include <map>
+#include <unordered_map>
 #include <string>
 #include <random>
 #include <memory>

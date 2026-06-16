@@ -1,10 +1,13 @@
 import grpc
 import matching_engine_pb2
 import matching_engine_pb2_grpc
+import os
 import time
 import threading
 from datetime import datetime
 from collections import deque
+
+GRPC_TARGET = os.environ.get("GRPC_SERVER_HOST", "localhost") + ":50051"
 
 class CandlestickChart:
     def __init__(self, symbol, candle_size_seconds):
@@ -44,7 +47,7 @@ class CandlestickChart:
             return None
 
 def subscribe_to_price(symbol, candle_size_seconds):
-    channel = grpc.insecure_channel("localhost:50051")
+    channel = grpc.insecure_channel(GRPC_TARGET)
     stub = matching_engine_pb2_grpc.MatchingEngineStub(channel)
     symbol_request = matching_engine_pb2.Symbol(symbol=symbol)
     candlestick_chart = CandlestickChart(symbol, candle_size_seconds)
