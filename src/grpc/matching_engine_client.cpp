@@ -218,6 +218,42 @@ void MatchingEngineClient::getLevel2(const std::string& symbol, int depth, bool 
     }
 }
 
+void MatchingEngineClient::subscribe(const std::string& symbol, int subscribeDurationSeconds) {
+    grpc::ClientContext context;
+    matchingengine::Symbol symbolRequest;
+    symbolRequest.set_symbol(symbol);
+
+    std::unique_ptr<grpc::ClientReader<matchingengine::FillNotification>> reader(
+        stub_->Subscribe(&context, symbolRequest)
+    );
+
+    matchingengine::FillNotification notif;
+    auto startTime = std::chrono::steady_clock::now();
+
+    while (reader->Read(&notif)) {
+        std::cout << "[FILL] " << notif.symbol()
+                  << " price=" << notif.price()
+                  << " size=" << notif.size()
+                  << " buy=" << (notif.buy() ? "true" : "false")
+                  << " partial=" << (notif.partial_fill() ? "true" : "false")
+                  << " remaining=" << notif.remaining_size()
+                  << std::endl;
+
+        auto currentTime = std::chrono::steady_clock::now();
+        if (std::chrono::duration_cast<std::chrono::seconds>(currentTime - startTime).count() >= subscribeDurationSeconds) {
+            context.TryCancel();
+            break;
+        }
+    }
+
+    grpc::Status status = reader->Finish();
+    if (!status.ok() && status.error_code() != grpc::StatusCode::CANCELLED) {
+        std::cerr << "Subscribe stream ended with error: " << status.error_message() << std::endl;
+    } else {
+        std::cout << "Finished subscribing to " << symbol << " for " << subscribeDurationSeconds << " seconds." << std::endl;
+    }
+}
+
 void measureLatency(MatchingEngineClient& client, const std::string& symbol, double price, unsigned int size, bool buy) {
     auto start = std::chrono::steady_clock::now();
     unsigned int orderId = client.addOrder(symbol, price, size, buy);

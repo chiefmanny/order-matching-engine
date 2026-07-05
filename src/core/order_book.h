@@ -6,11 +6,13 @@
 #include <deque>
 #include <map>
 #include <unordered_map>
+#include <queue>
 #include <string>
 #include <random>
 #include <memory>
 #include <thread>
 #include <mutex>
+#include <condition_variable>
 #include <shared_mutex>
 #include <utility>
 
@@ -21,6 +23,17 @@ public:
     const std::string security;
     const unsigned int securityId;
     unsigned int volume;
+
+    struct FillRecord {
+        double price;
+        uint32_t size;
+        bool buy;            // true = bid side was aggressor (fully consumed)
+        bool partial_fill;
+        uint32_t remaining_size;
+    };
+    std::mutex fillQueueMutex;
+    std::condition_variable fillQueueCv;
+    std::queue<FillRecord> fillQueue;
     std::map<double, LimitPrice> askTree;
     std::map<double, LimitPrice, std::greater<double>> bidTree;
     std::unordered_map<unsigned int, std::shared_ptr<OrderInternal>> allBuyOrders;

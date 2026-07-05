@@ -57,29 +57,47 @@ void MatchingAlgorithm::run(std::atomic<bool>& running, bool testFlag = false, b
                 while (!bestAsk->orders.empty() && !bestBid->orders.empty() && bestAsk->orders.front()->price <= bestBid->orders.front()->price) {
                     std::shared_ptr<OrderInternal> askOrder = bestAsk->orders.front();
                     std::shared_ptr<OrderInternal> bidOrder = bestBid->orders.front();
-                    
+
                     double fillPrice = (askOrder->price + bidOrder->price) / 2.0;
+                    uint32_t filledSize = 0;
+                    bool isBuy = false;
+                    bool isPartial = false;
+                    uint32_t remaining = 0;
 
                     if (askOrder->size > bidOrder->size) {
                         std::cout << "          Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << fillPrice << std::endl;
                         std::cout << "Partially matched order: " << askOrder->orderId << ": ASK " << bidOrder->size << " shares at $" << fillPrice << std::endl;
-                        askOrder->size -= bidOrder->size;
-                        orderbook.volume += bidOrder->size;
+                        filledSize = bidOrder->size;
+                        askOrder->size -= filledSize;
+                        remaining = askOrder->size;
+                        orderbook.volume += filledSize;
                         bidOrders.pop_front();
-                        
+                        isBuy = true; isPartial = true;
+
                     } else if (askOrder->size < bidOrder->size) {
                         std::cout << "          Matched order: " << askOrder->orderId << ": ASK " << askOrder->size << " shares at $" << fillPrice << std::endl;
                         std::cout << "Partially matched order: " << bidOrder->orderId << ": ASK " << askOrder->size << " shares at $" << fillPrice << std::endl;
-                        bidOrder->size -= askOrder->size;
-                        orderbook.volume += askOrder->size;
+                        filledSize = askOrder->size;
+                        bidOrder->size -= filledSize;
+                        remaining = bidOrder->size;
+                        orderbook.volume += filledSize;
                         askOrders.pop_front();
+                        isBuy = false; isPartial = true;
                     } else {
                         std::cout << "Matched order: " << askOrder->orderId << ": ASK " << askOrder->size << " shares at $" << fillPrice << std::endl;
                         std::cout << "Matched order: " << bidOrder->orderId << ": BID " << bidOrder->size << " shares at $" << fillPrice << std::endl;
+                        filledSize = bidOrder->size;
                         askOrders.pop_front();
                         bidOrders.pop_front();
-                        orderbook.volume += bidOrder->size;
+                        orderbook.volume += filledSize;
+                        isBuy = false; isPartial = false; remaining = 0;
                     }
+
+                    {
+                        std::lock_guard<std::mutex> qLock(orderbook.fillQueueMutex);
+                        orderbook.fillQueue.push({fillPrice, filledSize, isBuy, isPartial, remaining});
+                    }
+                    orderbook.fillQueueCv.notify_all();
                 }
                 // At this point, one or both LimitPrices have been exhausted, so they should be deleted from the book
                 if (askOrders.empty()) {

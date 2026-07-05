@@ -186,7 +186,43 @@ public:
     }
     
     Status Subscribe(ServerContext* context, const Symbol* symbol, ServerWriter<FillNotification>* writer) override {
-        
+        std::string symbolToWatch = symbol->symbol();
+
+        std::shared_lock<std::shared_mutex> lock(resources_mutex);
+        auto it = resources.find(symbolToWatch);
+        if (it == resources.end())
+            return grpc::Status(grpc::StatusCode::NOT_FOUND, "Symbol not supported");
+
+        OrderBook& orderbook = it->second.orderbook;
+
+        while (true) {
+            if (context->IsCancelled())
+                return grpc::Status::CANCELLED;
+
+            std::unique_lock<std::mutex> qLock(orderbook.fillQueueMutex);
+            orderbook.fillQueueCv.wait_for(qLock, std::chrono::milliseconds(200),
+                [&]{ return !orderbook.fillQueue.empty(); });
+
+            while (!orderbook.fillQueue.empty()) {
+                OrderBook::FillRecord rec = orderbook.fillQueue.front();
+                orderbook.fillQueue.pop();
+                qLock.unlock();
+
+                FillNotification notif;
+                notif.set_symbol(symbolToWatch);
+                notif.set_price(rec.price);
+                notif.set_size(rec.size);
+                notif.set_buy(rec.buy);
+                notif.set_partial_fill(rec.partial_fill);
+                notif.set_remaining_size(rec.remaining_size);
+
+                if (!writer->Write(notif))
+                    return grpc::Status::CANCELLED;
+
+                qLock.lock();
+            }
+        }
+        return grpc::Status::OK;
     }
 
     Status GetLevel2(ServerContext* context, const matchingengine::Level2Request* request, ServerWriter<matchingengine::Level2Response>* writer) override {
