@@ -6,8 +6,8 @@
 //
 
 #include "unit_tests.h"
-#include "../../backend/include/order_book.h"
-#include "../../backend/include/matching_algorithm.h"
+#include "order_book.h"
+#include "matching_algorithm.h"
 #include <stdio.h>
 #include <shared_mutex>
 #include <mutex>
@@ -51,8 +51,8 @@ void orderbook_basic_test_1() {
     book.cancelLimitOrder(orderIds[5]);
     book.cancelLimitOrder(orderIds[4]);
     
-    assert(!book.askTree.contains(14.5));
-    assert(!book.bidTree.contains(14.5));
+    assert(book.askTree.find(14.5) == book.askTree.end());
+    assert(book.bidTree.find(14.5) == book.bidTree.end());
     
     assert(book.getAsk() == 15.5);
     assert(book.getBid() == 13.5);
@@ -73,6 +73,7 @@ void orderbook_multithread_test_1() {
     std::shared_mutex bid;
     OrderBook book("GME", 1234567890, ask, bid);
     MatchingAlgorithm algo(book, ask, bid);
+    std::atomic<bool> running{true};
     
     // Function to add an order to the book
     auto addOrder = [&](double price, unsigned int size, bool buy) {
@@ -94,7 +95,7 @@ void orderbook_multithread_test_1() {
     
     // Perform matching
     std::thread algoThread([&]() {
-        algo.run(true);
+        algo.run(running, true, false);
     });
     
     // Join threads to wait for them to finish
@@ -111,6 +112,7 @@ void orderbook_multithread_test_2() {
     std::shared_mutex bid;
     OrderBook book("GME", 1234567890, ask, bid);
     MatchingAlgorithm algo(book, ask, bid);
+    std::atomic<bool> running{true};
     
     auto addOrder = [&](double price, unsigned int size, bool buy) {
         book.addLimitOrder(price, size, buy);
@@ -129,7 +131,7 @@ void orderbook_multithread_test_2() {
     threads.emplace_back(addOrder, 14.5, 123212355, false);
     
     std::thread algoThread([&]() {
-        algo.run(true);
+        algo.run(running, true, false);
     });
     
     for (auto& thread : threads) {
@@ -145,6 +147,7 @@ void orderbook_multithread_test_3() {
     std::shared_mutex bid;
     OrderBook book("GME", 1234567890, ask, bid);
     MatchingAlgorithm algo(book, ask, bid);
+    std::atomic<bool> running{true};
     
     auto addOrder = [&](double price, unsigned int size, bool buy) {
         book.addLimitOrder(price, size, buy);
@@ -155,7 +158,7 @@ void orderbook_multithread_test_3() {
     threads.emplace_back(addOrder, 14.5, 457434, false);
     
     std::thread algoThread([&]() {
-        algo.run(true);
+        algo.run(running, true, false);
     });
     
     for (auto& thread : threads) {
@@ -172,6 +175,7 @@ void randomized_orderbook_test() {
     std::shared_mutex bid;
     OrderBook book("GME", 1234567890, ask, bid);
     MatchingAlgorithm algo(book, ask, bid);
+    std::atomic<bool> running{true};
 
     // Function to add an order to the book
     auto addRandomOrder = [&](unsigned int count) {
@@ -202,7 +206,7 @@ void randomized_orderbook_test() {
 
     // Start the matching algorithm
     std::thread algoThread([&]() {
-        algo.run(true); // Run in testing mode
+        algo.run(running, true, false); // Run in testing mode
     });
 
     // Continue adding random orders while the algorithm is running
@@ -248,6 +252,7 @@ void skewed_orderbook_test(double midPrice, unsigned int maxSpread) {
     std::shared_mutex bid;
     OrderBook book("GME", 1234567890, ask, bid);
     MatchingAlgorithm algo(book, ask, bid);
+    std::atomic<bool> running{true};
 
     // Generate skewed orders
     generateSkewedOrders(book, 1000, midPrice, maxSpread);
@@ -257,7 +262,7 @@ void skewed_orderbook_test(double midPrice, unsigned int maxSpread) {
 
     // Start the matching algorithm
     std::thread algoThread([&]() {
-        algo.run(true); // Run in testing mode
+        algo.run(running, true, false); // Run in testing mode
     });
 
     // Continue adding skewed orders while the algorithm is running
@@ -278,6 +283,7 @@ void randomized_orderbook_test_buy_trend() {
     std::shared_mutex bid;
     OrderBook book("GME", 1234567890, ask, bid);
     MatchingAlgorithm algo(book, ask, bid);
+    std::atomic<bool> running{true};
     
     const unsigned int sharesPerOrder = 100;
 
@@ -320,7 +326,7 @@ void randomized_orderbook_test_buy_trend() {
 
     // Start the matching algorithm
     std::thread algoThread([&]() {
-        algo.run(true); // Run in testing mode
+        algo.run(running, true, false); // Run in testing mode
     });
 
     // Continue adding random orders while the algorithm is running
@@ -350,6 +356,7 @@ void massive_orderbook_test_price_movement() {
     // Initialize OrderBook and MatchingAlgorithm
     OrderBook book("GME", 1234567890, ask, bid);
     MatchingAlgorithm algo(book, ask, bid);
+    std::atomic<bool> running{true};
 
     // Function to add an order to the book
     auto addOrder = [&](double price, unsigned int size, bool buy) {
@@ -383,7 +390,7 @@ void massive_orderbook_test_price_movement() {
 
     // Perform matching
     std::thread algoThread([&]() {
-        algo.run(true);
+        algo.run(running, true, false);
     });
 
     // Join threads to wait for them to finish

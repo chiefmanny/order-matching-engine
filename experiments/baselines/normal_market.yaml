@@ -1,0 +1,131 @@
+# normal_market — the calibrated control market.
+#
+# This is the reference every later scenario inherits from and is compared against.
+# Do not tune it casually: changing these numbers invalidates the comparison basis
+# for every experiment that extends it.
+#
+# ---------------------------------------------------------------------------
+# How these values were chosen (Phase 5 calibration, one variable at a time)
+# ---------------------------------------------------------------------------
+#
+# orderIntervalMs 120/140, aggressiveProbability 0.35
+#   Measured. At the original 300/350ms and 0.20/0.15 the market produced only
+#   0.6 trades/s and 14 non-empty 1s candles in 45s — too quiet to see anything.
+#   These values put trade rate at ~2.2-2.5/s, inside the 2-8/s target band, with
+#   ~30 non-empty 1s candles.
+#
+# inventorySkewTicksPerUnit 4.0
+#   The load-bearing parameter. Without it the provider is an infinitely elastic
+#   wall: it refills every consumed level at the same price forever, so the mid it
+#   quotes is a fixed point and price discovery is impossible. Experiment 4 measured
+#   exactly that — price moved 12 ticks with noise alone and 2 ticks once a rigid
+#   provider was added, while the provider silently absorbed +1007 shares.
+#
+#   Swept 0/1/2/4/8 at fixed arrival rate:
+#     skew   peak inventory   ladder moved   mid range   LP orders
+#        0             1524              0           3          26
+#        1              660              1           1         401
+#        2              674              3           4         360
+#        4              621              6           5         538
+#        8              471             11           8         928
+#   Inventory control and price discovery both improve monotonically; the cost is
+#   requoting churn. 4.0 balances them — real price movement, bounded inventory,
+#   and roughly half the order churn of 8.0.
+#
+# halfSpreadTicks 1
+#   Swept 1/2/3 and it barely moved the realised spread (1.73 / 1.68 / 1.67 ticks).
+#   The engine has no immediate-or-cancel order type, so an aggressive noise order
+#   that only partly fills leaves its remainder RESTING inside the spread. Effective
+#   spread is therefore set by marketable-limit residuals, not by the provider's
+#   quotes, and widening the provider's quotes does not widen the market. Left at
+#   the simplest value. See the note at the bottom.
+#
+# ---------------------------------------------------------------------------
+# Measured character (see normal_market_metrics.json for the recorded reference)
+# ---------------------------------------------------------------------------
+#   trade rate        ~2.2-2.6 /s
+#   mean spread       ~1.7 ticks
+#   depth per side    ~5500-6300 shares across ~14 levels
+#   two-sided         ~94%
+#   mid range         5-8 ticks over 45s
+#   1s candles        ~27-32 non-empty of ~42
+
+name: normal_market
+description: Calibrated control market — one liquidity provider plus two noise traders.
+symbol: AAPL
+tick_size: 0.01
+duration_seconds: 45
+random_seed: 42
+
+recorder:
+  l2_depth: 15
+  l2_interval_ms: 100
+
+participants:
+  - id: lp1
+    strategy: liquidity_provider
+    start_at: 1
+    config:
+      referencePrice: 500.00
+      bidLevels: 10
+      askLevels: 10
+      halfSpreadTicks: 1
+      levelSpacingTicks: 5
+      averageQuantity: 500
+      quantityVariance: 150
+      replenishDelayMs: 400
+      recenterOnMid: true
+      recenterThresholdTicks: 15
+      inventorySkewTicksPerUnit: 4.0
+      maxInventorySkewTicks: 40
+
+  # Two traders with independent derived seeds, so their arrivals interleave
+  # irregularly rather than beating in lockstep.
+  - id: noise1
+    strategy: noise_trader
+    start_at: 3
+    config:
+      orderIntervalMs: 120
+      intervalJitterMs: 50
+      meanQuantity: 120
+      quantityVariance: 60
+      aggressiveProbability: 0.35
+      cancelProbability: 0.15
+      passivePlacementTicks: 8
+
+  - id: noise2
+    strategy: noise_trader
+    start_at: 3
+    config:
+      orderIntervalMs: 140
+      intervalJitterMs: 50
+      meanQuantity: 90
+      quantityVariance: 40
+      aggressiveProbability: 0.35
+      cancelProbability: 0.20
+      passivePlacementTicks: 6
+
+hypothesis:
+  statement: >
+    The control market trades continuously against a two-sided book that stays
+    populated, with an inventory-responsive provider so price can actually move.
+    Bands are set from measured calibration runs, wide enough to absorb seed noise.
+  expect:
+    - { metric: trades.rate_per_s,          op: ">=", value: 1.5 }
+    - { metric: trades.rate_per_s,          op: "<=", value: 6.0 }
+    - { metric: book.two_sided_fraction,    op: ">=", value: 0.90 }
+    - { metric: book.bid_depth,             op: ">=", value: 3000 }
+    - { metric: book.ask_depth,             op: ">=", value: 3000 }
+    - { metric: candles.1s.non_empty,       op: ">=", value: 20 }
+    # The provider must respond to inventory rather than absorb it without limit.
+    # This is the clause that would catch a regression back to the rigid wall.
+    - { metric: participant.lp1.strategy.ladder_center_range_ticks, op: ">=", value: 2 }
+    - { metric: participant.lp1.strategy.max_abs_inventory,         op: "<=", value: 1200 }
+
+# Known limitation, for whoever tunes this next:
+#   Realised spread (~1.7 ticks) sits below the 2-6 tick band the plan targeted, and
+#   no provider-side knob reaches it, for the residual-liquidity reason above. If a
+#   wider, provider-controlled spread turns out to matter for a later scenario, the
+#   fix belongs in the noise trader: give it an immediate-or-cancel approximation
+#   that pulls the unfilled remainder of an aggressive order after a few hundred ms,
+#   instead of leaving it to rest inside the spread.

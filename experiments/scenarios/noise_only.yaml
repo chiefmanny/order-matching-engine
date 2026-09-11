@@ -1,0 +1,39 @@
+# Experiment 3 — Noise without a liquidity provider.
+#
+# The control that motivates Participant A. It inherits the baseline market and
+# removes the liquidity provider, leaving only background flow.
+#
+# What it teaches:
+#   * Can undifferentiated flow sustain a book on its own?
+#   * What does a market with no dedicated liquidity provision actually look like —
+#     how wide, how thin, how often one-sided?
+#
+# Expectation: a ragged, frequently one-sided book with sporadic trades. If this
+# looked healthy, the liquidity provider would not be earning its place.
+
+extends: baselines/normal_market.yaml
+name: noise_only
+description: Two noise traders and no liquidity provider.
+duration_seconds: 45
+
+participants:
+  - id: lp1
+    remove: true
+
+  # With no provider there is no touch to quote around, so the noise traders need a
+  # reference price to bootstrap from.
+  - id: noise1
+    start_at: 1
+    config:
+      referencePrice: 500.00
+  - id: noise2
+    start_at: 1
+    config:
+      referencePrice: 500.00
+
+hypothesis:
+  statement: >
+    Noise alone cannot maintain an orderly two-sided book. Expect a substantially
+    lower two-sided fraction and a wider, more erratic spread than baseline_market.
+  expect:
+    - { metric: book.two_sided_fraction, op: "<", value: 0.95 }

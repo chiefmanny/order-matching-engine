@@ -1,0 +1,54 @@
+# Experiment 11 — Slicing the same quantity.
+#
+# Identical 2500-share order, identical book. The only variable is whether the order
+# arrives as one block or as a sequence of children, and how far apart.
+#
+# What it teaches:
+#   * Does spreading an order over time reduce peak impact and slippage, by letting
+#     the provider replenish between children?
+#   * This is the mechanism behind execution algorithms, isolated to one variable —
+#     and the direct precursor to the parent-order executor in Phase 11.
+#
+# Runs against deep_market, not normal_market: at 2500 shares this is ~10% of
+# displayed depth rather than ~39%, so the result measures slicing rather than the
+# book running out. Experiment 9 established that boundary.
+#
+# Settle block vs sliced with repeats, so seed noise cannot be mistaken for an effect:
+#   experiments/sweep.py experiments/scenarios/sweep_sliced.yaml \
+#     --param participants.sweep1.config.childOrders --values false,true --repeat 3
+
+extends: baselines/deep_market.yaml
+name: sweep_sliced
+description: 2500-share buy sweep delivered as 500-share children.
+duration_seconds: 45
+
+# A sweep is over in ~100ms — the engine's default BBO cadence — so observe finely
+# enough that peak impact is measured from more than a single sample.
+engine:
+  bbo_interval_ms: 20
+recorder:
+  l2_interval_ms: 25
+
+participants:
+  - id: sweep1
+    strategy: sweep
+    start_at: 25
+    config:
+      side: BUY
+      targetQuantity: 2500
+      maxLevels: 10
+      childOrders: true
+      childQuantity: 500
+      childDelayMs: 100
+      settleMs: 400
+      maxDurationMs: 15000
+
+markers:
+  - { at: 25, label: SLICED 2500 }
+
+hypothesis:
+  statement: >
+    Delivering the same quantity as spaced children lowers peak impact relative to a
+    single block, because the provider replenishes between children.
+  expect:
+    - { metric: sweep.depth_consumed, op: ">", value: 0 }

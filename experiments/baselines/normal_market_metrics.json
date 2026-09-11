@@ -1,0 +1,237 @@
+{
+  "baseline": "normal_market",
+  "scenario": "experiments/baselines/normal_market.yaml",
+  "note": "Reference character of the calibrated control market. Recorded from the runs listed below. Aggregate metrics (trade rate, spread mean, depth) are stable run to run; TAIL metrics (spread.max_ticks, mid.range_ticks) vary widely because engine thread interleaving is not deterministic even at a fixed seed. Compare later scenarios against the aggregates, and treat the tails as indicative only.",
+  "source_runs": [
+    "experiments/results/normal_market/run_001",
+    "experiments/results/normal_market/run_002"
+  ],
+  "git_commit": "a7c6a2b515b433b2467320368afe5d049ec85a99",
+  "observed": {
+    "trades.count": {
+      "runs": [
+        101,
+        93
+      ],
+      "mean": 97.0,
+      "min": 93,
+      "max": 101
+    },
+    "trades.rate_per_s": {
+      "runs": [
+        2.458,
+        2.387
+      ],
+      "mean": 2.4225,
+      "min": 2.387,
+      "max": 2.458
+    },
+    "trades.mean_size": {
+      "runs": [
+        78.9,
+        73.5
+      ],
+      "mean": 76.2,
+      "min": 73.5,
+      "max": 78.9
+    },
+    "trades.volume": {
+      "runs": [
+        7972,
+        6839
+      ],
+      "mean": 7405.5,
+      "min": 6839,
+      "max": 7972
+    },
+    "spread.mean_ticks": {
+      "runs": [
+        1.5,
+        1.52
+      ],
+      "mean": 1.51,
+      "min": 1.5,
+      "max": 1.52
+    },
+    "spread.max_ticks": {
+      "runs": [
+        5,
+        31
+      ],
+      "mean": 18.0,
+      "min": 5,
+      "max": 31
+    },
+    "book.two_sided_fraction": {
+      "runs": [
+        0.9416,
+        0.9441
+      ],
+      "mean": 0.9428,
+      "min": 0.9416,
+      "max": 0.9441
+    },
+    "book.bid_depth": {
+      "runs": [
+        6572,
+        6223
+      ],
+      "mean": 6397.5,
+      "min": 6223,
+      "max": 6572
+    },
+    "book.ask_depth": {
+      "runs": [
+        6042,
+        6020
+      ],
+      "mean": 6031.0,
+      "min": 6020,
+      "max": 6042
+    },
+    "book.bid_depth_min": {
+      "runs": [
+        2791,
+        3262
+      ],
+      "mean": 3026.5,
+      "min": 2791,
+      "max": 3262
+    },
+    "book.bid_levels": {
+      "runs": [
+        14.33,
+        14.33
+      ],
+      "mean": 14.33,
+      "min": 14.33,
+      "max": 14.33
+    },
+    "book.ask_levels": {
+      "runs": [
+        14.45,
+        14.56
+      ],
+      "mean": 14.505,
+      "min": 14.45,
+      "max": 14.56
+    },
+    "book.depth_imbalance_abs_mean": {
+      "runs": [
+        0.0744,
+        0.0592
+      ],
+      "mean": 0.0668,
+      "min": 0.0592,
+      "max": 0.0744
+    },
+    "mid.range_ticks": {
+      "runs": [
+        6,
+        16
+      ],
+      "mean": 11.0,
+      "min": 6,
+      "max": 16
+    },
+    "mid.realized_vol_bps": {
+      "runs": [
+        0.067,
+        0.17
+      ],
+      "mean": 0.1185,
+      "min": 0.067,
+      "max": 0.17
+    },
+    "price.range_ticks": {
+      "runs": [
+        5,
+        5
+      ],
+      "mean": 5.0,
+      "min": 5,
+      "max": 5
+    },
+    "candles.1s.non_empty": {
+      "runs": [
+        33,
+        30
+      ],
+      "mean": 31.5,
+      "min": 30,
+      "max": 33
+    },
+    "candles.1s.mean_range_ticks": {
+      "runs": [
+        0.7,
+        0.83
+      ],
+      "mean": 0.765,
+      "min": 0.7,
+      "max": 0.83
+    },
+    "candles.250ms.non_empty": {
+      "runs": [
+        61,
+        57
+      ],
+      "mean": 59.0,
+      "min": 57,
+      "max": 61
+    },
+    "candles.5s.non_empty": {
+      "runs": [
+        9,
+        8
+      ],
+      "mean": 8.5,
+      "min": 8,
+      "max": 9
+    },
+    "orders.fill_ratio": {
+      "runs": [
+        0.104,
+        0.1135
+      ],
+      "mean": 0.1087,
+      "min": 0.104,
+      "max": 0.1135
+    },
+    "orders.cancel_ratio": {
+      "runs": [
+        0.896,
+        0.8865
+      ],
+      "mean": 0.8912,
+      "min": 0.8865,
+      "max": 0.896
+    },
+    "participant.lp1.strategy.max_abs_inventory": {
+      "runs": [
+        677,
+        620
+      ],
+      "mean": 648.5,
+      "min": 620,
+      "max": 677
+    },
+    "participant.lp1.strategy.ladder_center_range_ticks": {
+      "runs": [
+        5,
+        5
+      ],
+      "mean": 5.0,
+      "min": 5,
+      "max": 5
+    },
+    "participant.lp1.strategy.skew_shifts": {
+      "runs": [
+        36,
+        30
+      ],
+      "mean": 33.0,
+      "min": 30,
+      "max": 36
+    }
+  }
+}

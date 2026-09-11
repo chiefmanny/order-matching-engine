@@ -5,7 +5,7 @@
 //  Created by Manan Manchanda on 3/31/24.
 //
 
-#include "../../build/matching_engine.grpc.pb.h"
+#include "matching_engine.grpc.pb.h"
 #include "../core/matching_algorithm.h"
 
 #include <algorithm>
@@ -19,6 +19,9 @@
 #include <utility>
 #include <thread>
 #include <atomic>
+#include <cctype>
+#include <cstdlib>
+#include <vector>
 #include <grpc/grpc.h>
 #include <grpcpp/security/server_credentials.h>
 #include <grpcpp/server.h>
@@ -41,6 +44,14 @@ using matchingengine::RejectedCancelOrder;
 using matchingengine::Symbol;
 using matchingengine::SymbolData;
 using std::chrono::system_clock;
+
+// How often WatchSymbol pushes a BBO sample, in milliseconds.
+//
+// 100ms was hardcoded, which is coarser than the events the experiment harness
+// measures: an unsliced sweep completes in ~100ms, so peak price impact was being
+// computed from roughly a single sample. Configurable so experiments can observe at
+// 20ms while the default keeps the documented 100ms cadence for existing clients.
+std::atomic<int> g_bboIntervalMs{100};
 
 struct SymbolResources {
     std::shared_mutex askMutex;
@@ -76,15 +87,16 @@ private:
     std::map<std::string, SymbolResources> resources;
     std::shared_mutex resources_mutex; // Protects access to the resources map
 public:
-    MatchingEngineImpl() {
-        resources.emplace(std::piecewise_construct,
-                  std::forward_as_tuple("AAPL"),     // std::forward_as_tuple: perfect forwarding
-                  std::forward_as_tuple("AAPL", 1));
-        // resources.emplace(std::piecewise_construct,
-        //           std::forward_as_tuple("GME"),
-        //           std::forward_as_tuple("GME", 2));
-
-        // Add more symbols as needed
+    // Symbols are supplied by the caller so experiments can run multi-symbol markets
+    // without recompiling.  Each gets its own order book and matching thread.
+    explicit MatchingEngineImpl(const std::vector<std::string>& symbols) {
+        int nextId = 1;
+        for (const auto& sym : symbols) {
+            resources.emplace(std::piecewise_construct,
+                      std::forward_as_tuple(sym),   // std::forward_as_tuple: perfect forwarding
+                      std::forward_as_tuple(sym, nextId++));
+            std::cout << "Registered symbol: " << sym << std::endl;
+        }
     }
 
     Status AddLimitOrder(ServerContext* context, const Order* order, OrderID* id) override {
@@ -178,13 +190,21 @@ public:
                 return grpc::Status::CANCELLED;
             }
 
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(
+                std::chrono::milliseconds(g_bboIntervalMs.load()));
         }
 
         // This line will never be reached, but it's good practice to include a return statement
         return grpc::Status::OK;
     }
     
+    // Streams the trade tape.
+    //
+    // Each caller gets its OWN subscription queue and the matching thread fans every
+    // fill out to all of them, so a market recorder and any number of participants
+    // can all subscribe at once and each see the complete tape.  (This previously
+    // popped from a single shared queue, which silently split trades between
+    // concurrent subscribers.)
     Status Subscribe(ServerContext* context, const Symbol* symbol, ServerWriter<FillNotification>* writer) override {
         std::string symbolToWatch = symbol->symbol();
 
@@ -195,19 +215,23 @@ public:
 
         OrderBook& orderbook = it->second.orderbook;
 
+        auto subscription = orderbook.subscribeFills();
+        // Deregister on every exit path, including a client disconnect.
+        struct Unsubscriber {
+            OrderBook& book;
+            std::shared_ptr<OrderBook::FillSubscriber> sub;
+            ~Unsubscriber() { book.unsubscribeFills(sub); }
+        } guard{orderbook, subscription};
+
+        std::vector<OrderBook::FillRecord> batch;
         while (true) {
             if (context->IsCancelled())
                 return grpc::Status::CANCELLED;
 
-            std::unique_lock<std::mutex> qLock(orderbook.fillQueueMutex);
-            orderbook.fillQueueCv.wait_for(qLock, std::chrono::milliseconds(200),
-                [&]{ return !orderbook.fillQueue.empty(); });
+            batch.clear();
+            subscription->waitAndDrain(batch, std::chrono::milliseconds(200));
 
-            while (!orderbook.fillQueue.empty()) {
-                OrderBook::FillRecord rec = orderbook.fillQueue.front();
-                orderbook.fillQueue.pop();
-                qLock.unlock();
-
+            for (const auto& rec : batch) {
                 FillNotification notif;
                 notif.set_symbol(symbolToWatch);
                 notif.set_price(rec.price);
@@ -215,11 +239,13 @@ public:
                 notif.set_buy(rec.buy);
                 notif.set_partial_fill(rec.partial_fill);
                 notif.set_remaining_size(rec.remaining_size);
+                notif.set_timestamp_ns(rec.ts_ns);
+                notif.set_maker_order_id(rec.maker_order_id);
+                notif.set_taker_order_id(rec.taker_order_id);
+                notif.set_aggressor_is_buy(rec.aggressor_is_buy);
 
                 if (!writer->Write(notif))
                     return grpc::Status::CANCELLED;
-
-                qLock.lock();
             }
         }
         return grpc::Status::OK;
@@ -279,19 +305,77 @@ public:
     }
 };
 
-void RunServer() {
-    std::string server_address("0.0.0.0:50051");
-    MatchingEngineImpl service;
+void RunServer(const std::string& server_address, const std::vector<std::string>& symbols) {
+    MatchingEngineImpl service(symbols);
 
     ServerBuilder builder;
     builder.AddListeningPort(server_address, grpc::InsecureServerCredentials());
     builder.RegisterService(&service);
     std::unique_ptr<Server> server(builder.BuildAndStart());
-    std::cout << "Server listening on " << server_address << std::endl;
+    if (!server) {
+        std::cerr << "Failed to bind " << server_address << std::endl;
+        std::exit(1);
+    }
+    std::cout << "Server listening on " << server_address
+              << " (BBO interval " << g_bboIntervalMs.load() << "ms)" << std::endl;
     server->Wait();
 }
 
+namespace {
+std::vector<std::string> splitCsv(const std::string& s) {
+    std::vector<std::string> out;
+    std::string current;
+    for (char c : s) {
+        if (c == ',') {
+            if (!current.empty()) out.push_back(current);
+            current.clear();
+        } else if (!std::isspace(static_cast<unsigned char>(c))) {
+            current += c;
+        }
+    }
+    if (!current.empty()) out.push_back(current);
+    return out;
+}
+}  // namespace
+
+// Usage: matching_engine_server [--symbols AAPL,MSFT] [--address 0.0.0.0:50051]
+//                               [--bbo-interval-ms N] [--verbose]
+// Symbols may also come from the ME_SYMBOLS environment variable.
 int main(int argc, char** argv) {
-    RunServer();
+    std::string address = "0.0.0.0:50051";
+    std::string symbolList;
+
+    if (const char* env = std::getenv("ME_SYMBOLS")) symbolList = env;
+
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--symbols" && i + 1 < argc) {
+            symbolList = argv[++i];
+        } else if (arg == "--address" && i + 1 < argc) {
+            address = argv[++i];
+        } else if (arg == "--bbo-interval-ms" && i + 1 < argc) {
+            const int ms = std::atoi(argv[++i]);
+            if (ms < 1 || ms > 10000) {
+                std::cerr << "--bbo-interval-ms must be between 1 and 10000\n";
+                return 1;
+            }
+            g_bboIntervalMs = ms;
+        } else if (arg == "--verbose") {
+            // Per-match and per-pointer-refresh chatter is off by default: it
+            // dominates runtime and pollutes the harness's structured logs.
+            OrderBook::verbose = true;
+        } else {
+            std::cerr << "Unknown argument: " << arg << "\n"
+                      << "Usage: " << argv[0]
+                      << " [--symbols AAPL,MSFT] [--address host:port]"
+                         " [--bbo-interval-ms N] [--verbose]" << std::endl;
+            return 1;
+        }
+    }
+
+    std::vector<std::string> symbols = splitCsv(symbolList);
+    if (symbols.empty()) symbols.push_back("AAPL");
+
+    RunServer(address, symbols);
     return 0;
 }

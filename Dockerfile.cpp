@@ -9,6 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgrpc++-dev \
     protobuf-compiler-grpc \
     libprotobuf-dev \
+    nlohmann-json3-dev \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -31,6 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 WORKDIR /app
 COPY --from=builder /app/build/matching_engine_server .
 COPY --from=builder /app/build/mean_reversion_client .
+COPY --from=builder /app/build/participant_runner .
+COPY --from=builder /app/build/market_recorder .
 
 EXPOSE 50051
 CMD ["./matching_engine_server"]

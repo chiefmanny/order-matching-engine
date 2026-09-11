@@ -1,0 +1,39 @@
+# Experiment 8 — Large sweep.
+#
+# Identical to small_sweep except for the quantity, so any difference is
+# attributable to size alone.
+#
+# What it teaches:
+#   * How non-linear is impact in quantity?
+#   * How many levels disappear, and how long does depth take to come back?
+
+extends: scenarios/small_sweep.yaml
+name: large_sweep
+description: Calibrated baseline plus a 5000-share buy sweep at T+25.
+duration_seconds: 45
+
+# A sweep is over in ~100ms — the engine's default BBO cadence — so observe finely
+# enough that peak impact is measured from more than a single sample.
+engine:
+  bbo_interval_ms: 20
+recorder:
+  l2_interval_ms: 25
+
+participants:
+  - id: sweep1
+    config:
+      targetQuantity: 5000
+      maxLevels: 10
+
+markers:
+  - { at: 25, label: SWEEP 5000 }
+
+hypothesis:
+  statement: >
+    A 5000-share buy consumes several levels and produces materially more slippage
+    and price impact than the 500-share case — impact grows faster than linearly in
+    quantity because each successive level is further from the touch.
+  expect:
+    - { metric: sweep.levels_consumed,   op: ">=", value: 3 }
+    - { metric: sweep.peak_impact_ticks, op: ">=", value: 2 }
+    - { metric: sweep.volume_during,     op: ">=", value: 1000 }

@@ -37,6 +37,13 @@
 !frontend/package.json
 !frontend/package-lock.json
 
+# Experiment harness: scenario definitions and calibrated baselines are source and
+# must be committed, but raw run artifacts (trades/bbo/level2 CSVs, logs) are not.
+# Without these negations the *.csv / *.json rules above silently swallow configs.
+!experiments/scenarios/**
+!experiments/baselines/**
+experiments/results/
+
 # Mac stuff
 *.DS_Store
 

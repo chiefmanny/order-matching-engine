@@ -1,0 +1,9 @@
+# Experiment harness dependencies.
+#
+#   pip install -r experiments/requirements.txt
+#
+# Python orchestrates and analyses only. The matching engine and every market
+# participant are the real C++ binaries — no market logic lives here.
+PyYAML>=6.0
+pandas>=2.0
+matplotlib>=3.7

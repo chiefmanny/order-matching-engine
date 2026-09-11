@@ -1,7 +1,7 @@
 #ifndef MATCHING_ENGINE_CLIENT_H
 #define MATCHING_ENGINE_CLIENT_H
 
-#include "../../build/matching_engine.grpc.pb.h"
+#include "matching_engine.grpc.pb.h"
 #include <grpc/grpc.h>
 #include <grpcpp/channel.h>
 #include <grpcpp/client_context.h>

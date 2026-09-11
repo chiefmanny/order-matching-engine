@@ -1,0 +1,46 @@
+# Experiment 10 — The same sweep into books of different depth.
+#
+# Quantity is held fixed at 2500 (inside the range where the previous experiment
+# showed a clean, interpretable relationship). The only thing that varies is how much
+# liquidity the provider is displaying.
+#
+# What it teaches:
+#   * Does thinner displayed depth mean more levels consumed and greater slippage for
+#     an identical order?
+#   * This is the core "liquidity determines impact" claim, isolated.
+#
+# Run with:
+#   experiments/sweep.py experiments/scenarios/sweep_depth_comparison.yaml \
+#     --param participants.lp1.config.averageQuantity --values 250,500,1000
+
+extends: baselines/normal_market.yaml
+name: sweep_depth_comparison
+description: Fixed 2500-share buy sweep; provider depth is the variable.
+duration_seconds: 45
+
+# A sweep is over in ~100ms — the engine's default BBO cadence — so observe finely
+# enough that peak impact is measured from more than a single sample.
+engine:
+  bbo_interval_ms: 20
+recorder:
+  l2_interval_ms: 25
+
+participants:
+  - id: sweep1
+    strategy: sweep
+    start_at: 25
+    config:
+      side: BUY
+      targetQuantity: 2500
+      maxLevels: 10
+      settleMs: 400
+
+markers:
+  - { at: 25, label: SWEEP 2500 }
+
+hypothesis:
+  statement: >
+    For an identical 2500-share order, a thinner displayed book yields greater VWAP
+    slippage and consumes a larger fraction of available depth.
+  expect:
+    - { metric: sweep.depth_consumed, op: ">", value: 0 }

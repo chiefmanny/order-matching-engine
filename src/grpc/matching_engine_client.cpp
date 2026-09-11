@@ -5,7 +5,7 @@
 //  Created by Manan Manchanda on 3/31/24.
 //
 
-#include "../../build/matching_engine.grpc.pb.h"
+#include "matching_engine.grpc.pb.h"
 #include "matching_engine_client.h"
 
 #include <chrono>

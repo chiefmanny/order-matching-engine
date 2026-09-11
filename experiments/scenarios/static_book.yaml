@@ -1,0 +1,46 @@
+# Experiment 1 — Static liquidity.
+#
+# The control case: one liquidity provider, nothing trading against it.
+#
+# What it teaches:
+#   * Is the ladder constructed correctly (prices on the tick grid, right spacing)?
+#   * Is displayed depth shaped the way the parameters say?
+#   * Does the provider hold a complete book with no churn when nothing happens?
+#
+# This is also the standing regression test for the engine's Level 2 depth
+# bookkeeping: with no trades at all, displayed depth must stay exactly constant.
+
+name: static_book
+description: One liquidity provider seeding a 10x10 ladder, with no other flow.
+symbol: AAPL
+tick_size: 0.01
+duration_seconds: 20
+random_seed: 42
+
+recorder:
+  l2_depth: 15
+  l2_interval_ms: 100
+
+participants:
+  - id: lp1
+    strategy: liquidity_provider
+    start_at: 1
+    config:
+      referencePrice: 500.00
+      bidLevels: 10
+      askLevels: 10
+      halfSpreadTicks: 1
+      levelSpacingTicks: 5
+      averageQuantity: 500
+      replenishDelayMs: 400
+
+hypothesis:
+  statement: >
+    With no counterparty flow, the book reaches 10 levels per side totalling 5000
+    shares each and stays exactly there: no trades, no depth drift, no churn.
+  expect:
+    - { metric: trades.count, op: "==", value: 0 }
+    - { metric: book.bid_levels, op: "==", value: 10 }
+    - { metric: book.ask_levels, op: "==", value: 10 }
+    - { metric: book.bid_depth, op: "==", value: 5000 }
+    - { metric: book.ask_depth, op: "==", value: 5000 }

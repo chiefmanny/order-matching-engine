@@ -1,0 +1,52 @@
+# deep_market — a control market with enough displayed depth to absorb large events.
+#
+# Same participants and same character as normal_market; the provider simply shows
+# more. Use this for any scenario whose event is large relative to the book.
+#
+# Why it exists: Experiment 9 measured the limit of normal_market directly. Against
+# ~6500 shares per side, a sweep above ~2500 consumes 40%+ of displayed depth and
+# stops walking the book -- it annihilates it. Past that point fill rate collapses
+# (100% -> 34% by 10000 shares) and impact/recovery become erratic, so the numbers
+# stop describing a liquidity-taking event at all.
+#
+# normal_market stays the control for ordinary-market work. This is the control for
+# large sweeps, parent-order execution, and liquidity-crisis scenarios.
+#
+# Depth here is ~4x normal_market: 20 levels per side at ~1200 shares, so a 10000
+# share order is still a minority of displayed liquidity.
+
+extends: baselines/normal_market.yaml
+name: deep_market
+description: Deeper control market — same behavior, ~4x the displayed depth.
+duration_seconds: 45
+
+engine:
+  # A discrete event is over in ~100ms, which is the engine's default BBO cadence, so
+  # peak impact would be measured from a single sample. Observe 5x finer.
+  bbo_interval_ms: 20
+
+recorder:
+  l2_depth: 25
+  l2_interval_ms: 25
+
+participants:
+  - id: lp1
+    config:
+      bidLevels: 20
+      askLevels: 20
+      averageQuantity: 1200
+      quantityVariance: 300
+      # Inventory turnover scales with the size the provider quotes, so the response
+      # is expressed per quoted lot rather than per fixed share count.
+      inventoryUnitShares: 1200
+      inventorySkewTicksPerUnit: 4.0
+
+hypothesis:
+  statement: >
+    Same market character as normal_market, with roughly four times the displayed
+    depth per side, so a large order remains a minority of available liquidity.
+  expect:
+    - { metric: trades.rate_per_s,       op: ">=", value: 1.0 }
+    - { metric: book.two_sided_fraction, op: ">=", value: 0.90 }
+    - { metric: book.bid_depth,          op: ">=", value: 15000 }
+    - { metric: book.ask_depth,          op: ">=", value: 15000 }

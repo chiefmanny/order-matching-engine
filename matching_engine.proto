@@ -31,13 +31,24 @@ message OrderID {
     optional int32 id = 2;
 }
 
+// One executed trade.
+//
+// Fields 1-6 keep their original meanings and wire tags so existing subscribers
+// (including the finchart terminal adapter, which vendors its own copy of this
+// file) continue to decode unchanged.  Fields 7-10 are additive.
 message FillNotification {
     string symbol = 1;
-    double price = 2;
+    double price = 2;          // the MAKER's limit price (price-time priority)
     int32 size = 3;
-    bool buy = 4;
+    bool buy = 4;              // legacy: true when the BID order was fully consumed.
+                               // This is NOT the aggressor side -- use aggressor_is_buy.
     bool partial_fill = 5;
     int32 remaining_size = 6;
+
+    int64 timestamp_ns = 7;    // engine-side system_clock time of the match
+    uint32 maker_order_id = 8; // resting order that set the price
+    uint32 taker_order_id = 9; // aggressing order that crossed the spread
+    bool aggressor_is_buy = 10; // true when the buyer lifted the ask
 }
 
 message RejectedAddOrder {
