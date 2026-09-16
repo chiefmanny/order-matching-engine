@@ -56,7 +56,28 @@ struct LadderParams {
     double inventorySkewTicksPerUnit = 0.0;  // 0 => disabled (rigid wall)
     int    maxInventorySkewTicks    = 50;
 
-    std::string mode                = "normal";
+    // Liquidity withdrawal.
+    //
+    // mode="withdraw" makes this provider pull its book partway through the run. The
+    // switch happens INSIDE the participant rather than by stopping it and starting
+    // another: a stopped participant cancels everything at once, which is a cliff,
+    // not a withdrawal -- and a replacement participant could not cancel orders it
+    // does not own anyway.
+    //
+    // Levels are pulled progressively over withdrawDurationMs, and nothing is
+    // replenished once withdrawal begins.
+    //
+    // withdrawOrder decides which levels go first, and it changes what the event
+    // looks like entirely:
+    //   inside_out  - nearest the touch first, so the SPREAD widens progressively
+    //                 while outer depth lingers. This is the usual crisis behavior:
+    //                 the quotes closest to the touch are the ones being picked off.
+    //   outside_in  - furthest first, so DEPTH thins while the touch holds until the
+    //                 very end.
+    std::string mode                = "normal";   // "normal" | "withdraw"
+    double withdrawAfterSeconds     = 0.0;   // elapsed time before pulling begins
+    int    withdrawDurationMs       = 5000;  // how long the pull takes
+    std::string withdrawOrder       = "inside_out";  // "inside_out" | "outside_in"
 
     // Throws std::runtime_error with an actionable message on invalid input.
     static LadderParams fromJson(const nlohmann::json& j);
@@ -97,6 +118,9 @@ private:
 
     void rebuildDesired(StrategyContext& ctx, double centerPrice);
     void drainFills(StrategyContext& ctx);
+    // Returns true while this provider is withdrawing (or has finished withdrawing),
+    // in which case the normal reconcile loop is skipped entirely.
+    bool handleWithdrawal(StrategyContext& ctx);
 
     LadderParams params_;
     double reference_ = 0.0;        // anchor; moved by recenterOnMid
@@ -121,6 +145,10 @@ private:
     long long maxAbsInventory_  = 0;
     long long minCenterTick_    = 0;
     long long maxCenterTick_    = 0;
+    bool      withdrawing_      = false;
+    bool      withdrawComplete_ = false;
+    double    withdrawBeganAt_  = -1.0;   // elapsed seconds, -1 until started
+    long long levelsWithdrawn_  = 0;
     long long fillsObserved_    = 0;
     long long sharesFilled_     = 0;
     long long ticksObserved_    = 0;

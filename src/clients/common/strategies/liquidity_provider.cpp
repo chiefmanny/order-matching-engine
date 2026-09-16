@@ -36,6 +36,9 @@ LadderParams LadderParams::fromJson(const nlohmann::json& j) {
     p.inventorySkewTicksPerUnit = j.value("inventorySkewTicksPerUnit", p.inventorySkewTicksPerUnit);
     p.maxInventorySkewTicks    = j.value("maxInventorySkewTicks", p.maxInventorySkewTicks);
     p.mode                     = j.value("mode", p.mode);
+    p.withdrawAfterSeconds     = j.value("withdrawAfterSeconds", p.withdrawAfterSeconds);
+    p.withdrawDurationMs       = j.value("withdrawDurationMs", p.withdrawDurationMs);
+    p.withdrawOrder            = j.value("withdrawOrder", p.withdrawOrder);
 
     if (!(p.referencePrice > 0.0)) {
         throw std::runtime_error("liquidity_provider: referencePrice must be > 0");
@@ -75,11 +78,24 @@ LadderParams LadderParams::fromJson(const nlohmann::json& j) {
             "liquidity_provider: recenterOnMid requires recenterThresholdTicks >= 1");
     }
     // `thin` is deliberately NOT a mode: a thin book is just fewer levels and a
-    // smaller averageQuantity, which configuration already expresses.  `withdraw`
-    // arrives in Phase 10 and must not silently behave like `normal` before then.
-    if (p.mode != "normal") {
+    // smaller averageQuantity, which configuration already expresses.
+    if (p.mode != "normal" && p.mode != "withdraw") {
         throw std::runtime_error("liquidity_provider: unsupported mode '" + p.mode +
-                                 "' (only 'normal' is implemented; 'withdraw' lands in Phase 10)");
+                                 "' (expected 'normal' or 'withdraw')");
+    }
+    if (p.mode == "withdraw") {
+        if (p.withdrawAfterSeconds < 0.0) {
+            throw std::runtime_error(
+                "liquidity_provider: withdrawAfterSeconds must be >= 0");
+        }
+        if (p.withdrawDurationMs < 0) {
+            throw std::runtime_error(
+                "liquidity_provider: withdrawDurationMs must be >= 0");
+        }
+        if (p.withdrawOrder != "inside_out" && p.withdrawOrder != "outside_in") {
+            throw std::runtime_error(
+                "liquidity_provider: withdrawOrder must be \"inside_out\" or \"outside_in\"");
+        }
     }
     return p;
 }
@@ -218,8 +234,84 @@ void LiquidityProvider::drainFills(StrategyContext& ctx) {
     }
 }
 
+bool LiquidityProvider::handleWithdrawal(StrategyContext& ctx) {
+    if (params_.mode != "withdraw") return false;
+    if (ctx.elapsedSeconds < params_.withdrawAfterSeconds) return false;
+
+    if (!withdrawing_) {
+        withdrawing_ = true;
+        // Anchor progress to the CONFIGURED moment, not to the first tick that
+        // happened to observe it. Anchoring to the tick makes the opening tick always
+        // cancel nothing, and makes the whole schedule drift with the decision
+        // interval -- so the same scenario would withdraw at different rates
+        // depending on an unrelated setting.
+        withdrawBeganAt_ = params_.withdrawAfterSeconds;
+        ctx.log.note("liquidity_provider: withdrawing liquidity",
+                     {{"order", params_.withdrawOrder},
+                      {"duration_ms", params_.withdrawDurationMs},
+                      {"levels", slots_.size()}});
+    }
+    if (withdrawComplete_) return true;
+
+    const double elapsedMs = (ctx.elapsedSeconds - withdrawBeganAt_) * 1000.0;
+    double progress = params_.withdrawDurationMs > 0
+                          ? elapsedMs / params_.withdrawDurationMs
+                          : 1.0;
+    if (progress < 0.0) progress = 0.0;
+    if (progress > 1.0) progress = 1.0;
+
+    // Sort each side by distance from the ladder centre, then pull a prefix whose
+    // size grows with elapsed progress. Doing it by proportion rather than by a
+    // per-tick count keeps the pace independent of the decision interval.
+    std::vector<long long> bids, asks;
+    for (const auto& entry : slots_) {
+        (entry.second.level.buy ? bids : asks).push_back(entry.first);
+    }
+    // Bids ascend away from the centre as the index falls; asks as it rises.
+    std::sort(bids.begin(), bids.end(), std::greater<long long>());  // inside first
+    std::sort(asks.begin(), asks.end());                             // inside first
+    if (params_.withdrawOrder == "outside_in") {
+        std::reverse(bids.begin(), bids.end());
+        std::reverse(asks.begin(), asks.end());
+    }
+
+    auto pullFrom = [&](const std::vector<long long>& ordered) {
+        const size_t target =
+            static_cast<size_t>(std::llround(progress * static_cast<double>(ordered.size())));
+        for (size_t i = 0; i < target && i < ordered.size(); ++i) {
+            auto it = slots_.find(ordered[i]);
+            if (it == slots_.end()) continue;
+            if (it->second.orderId != 0 && ctx.orders.isLiveOrder(it->second.orderId)) {
+                ctx.engine.cancel(it->second.orderId);
+                ++levelsWithdrawn_;
+            }
+            // Blocking replenishment matters as much as the cancel: without it the
+            // reconcile loop would refill the level on the very next tick.
+            it->second.orderId = 0;
+            it->second.readyAt = ctx.now + std::chrono::hours(24);
+        }
+    };
+    pullFrom(bids);
+    pullFrom(asks);
+
+    if (progress >= 1.0 && !withdrawComplete_) {
+        withdrawComplete_ = true;
+        ctx.log.note("liquidity_provider: withdrawal complete",
+                     {{"levels_withdrawn", levelsWithdrawn_}});
+    }
+    return true;
+}
+
 void LiquidityProvider::onTick(StrategyContext& ctx) {
     if (!started_) return;
+
+    // Withdrawal replaces the reconcile loop entirely: re-centring or replenishing
+    // while pulling the book would fight the withdrawal.
+    if (handleWithdrawal(ctx)) {
+        ++ticksObserved_;
+        lastTickAt_ = ctx.now;
+        return;
+    }
 
     // Re-center on a sustained mid move so the ladder follows the market instead of
     // being walked through and left behind.
@@ -325,5 +417,9 @@ nlohmann::json LiquidityProvider::metrics() const {
         {"mean_bid_depth", bidDepthSamples_ / ticks},
         {"mean_ask_depth", askDepthSamples_ / ticks},
         {"seconds_with_incomplete_ladder", secondsIncomplete_},
+        {"mode", params_.mode},
+        {"withdrawing", withdrawing_},
+        {"withdraw_complete", withdrawComplete_},
+        {"levels_withdrawn", levelsWithdrawn_},
     };
 }

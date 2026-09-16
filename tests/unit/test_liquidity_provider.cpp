@@ -161,8 +161,9 @@ void test_param_validation() {
     rejects({{"referencePrice", 100.0}, {"averageQuantity", 100}, {"quantityVariance", 100}},
             "variance >= averageQuantity could yield a zero size");
     rejects({{"referencePrice", 100.0}, {"recenterOnMid", true}}, "recenter without a threshold");
-    // An unimplemented mode must fail loudly rather than silently acting normal.
-    rejects({{"referencePrice", 100.0}, {"mode", "withdraw"}}, "unimplemented withdraw mode");
+    // An unknown mode must fail loudly rather than silently acting normal.
+    // (`withdraw` was rejected here until Phase 10 implemented it; it is now valid
+    // and is covered by the withdrawal tests below.)
     rejects({{"referencePrice", 100.0}, {"mode", "nonsense"}}, "unknown mode");
     rejects({{"referencePrice", 100.0}, {"inventorySkewTicksPerUnit", -1.0}},
             "negative skew coefficient would amplify inventory into a runaway");
@@ -447,6 +448,156 @@ void test_no_shift_without_inventory_change() {
     std::cout << "  sub-tick inventory stability checked" << std::endl;
 }
 
+// --------------------------------------------------------------------------
+// Liquidity withdrawal (mode: withdraw)
+// --------------------------------------------------------------------------
+
+// The fixture's elapsedSeconds is fixed at 0, but withdrawal is driven by elapsed
+// time, so these drive it explicitly.
+static StrategyContext ctxAt(Fixture& f, double elapsedSeconds) {
+    return StrategyContext{f.market, f.tracker, f.position, f.rng, f.gateway, f.log,
+                           f.params, f.now, kTick, elapsedSeconds};
+}
+
+void test_withdraw_mode_is_accepted_and_validated() {
+    LadderParams p = LadderParams::fromJson(
+        {{"referencePrice", 500.0}, {"mode", "withdraw"},
+         {"withdrawAfterSeconds", 20}, {"withdrawDurationMs", 4000}});
+    check(p.mode == "withdraw", "withdraw mode parses");
+    check(p.withdrawOrder == "inside_out", "withdrawal defaults to inside-out");
+
+    auto rejects = [](nlohmann::json j, const std::string& why) {
+        try {
+            LadderParams::fromJson(j);
+            std::cout << "  [FAIL] should have rejected: " << why << std::endl;
+            ++failures;
+        } catch (const std::runtime_error&) {}
+    };
+    rejects({{"referencePrice", 500.0}, {"mode", "withdraw"},
+             {"withdrawOrder", "sideways"}}, "unknown withdrawal order");
+    rejects({{"referencePrice", 500.0}, {"mode", "withdraw"},
+             {"withdrawAfterSeconds", -1}}, "negative withdrawal delay");
+    std::cout << "  withdraw parameters checked" << std::endl;
+}
+
+void test_withdrawal_does_not_start_early() {
+    Fixture f;
+    f.params = {{"referencePrice", 500.00}, {"bidLevels", 5}, {"askLevels", 5},
+                {"mode", "withdraw"}, {"withdrawAfterSeconds", 20},
+                {"withdrawDurationMs", 2000}};
+    LiquidityProvider lp;
+    auto c0 = ctxAt(f, 0.0); lp.onStart(c0);
+    for (int i = 0; i < 10; ++i) { f.advance(100); auto c = ctxAt(f, i * 0.1); lp.onTick(c); }
+
+    check(f.tracker.activeCount() == 10, "the full ladder is quoted before withdrawal");
+    check(f.gateway.canceled.empty(), "nothing is cancelled before withdrawAfterSeconds");
+    check(!lp.metrics()["withdrawing"].get<bool>(), "not yet withdrawing");
+    std::cout << "  withdrawal timing checked" << std::endl;
+}
+
+void test_withdrawal_pulls_the_whole_book_progressively() {
+    Fixture f;
+    f.params = {{"referencePrice", 500.00}, {"bidLevels", 5}, {"askLevels", 5},
+                {"mode", "withdraw"}, {"withdrawAfterSeconds", 5},
+                {"withdrawDurationMs", 2000}};
+    LiquidityProvider lp;
+    auto c0 = ctxAt(f, 0.0); lp.onStart(c0);
+    { f.advance(100); auto c = ctxAt(f, 0.1); lp.onTick(c); }
+    check(f.tracker.activeCount() == 10, "ladder seeded");
+
+    // Halfway through the withdrawal window, roughly half the book should be gone.
+    f.advance(100); { auto c = ctxAt(f, 6.0); lp.onTick(c); }
+    const int midway = f.tracker.activeCount();
+    check(midway > 0 && midway < 10,
+          "withdrawal is progressive, not a cliff (got " + std::to_string(midway) + " live)");
+
+    // Past the end of the window, everything is gone.
+    f.advance(100); { auto c = ctxAt(f, 8.0); lp.onTick(c); }
+    check(f.tracker.activeCount() == 0, "the whole book is withdrawn by the end");
+    check(lp.metrics()["withdraw_complete"].get<bool>(), "withdrawal reports complete");
+    std::cout << "  progressive withdrawal checked" << std::endl;
+}
+
+void test_withdrawn_levels_are_not_replenished() {
+    Fixture f;
+    f.params = {{"referencePrice", 500.00}, {"bidLevels", 5}, {"askLevels", 5},
+                {"mode", "withdraw"}, {"withdrawAfterSeconds", 1},
+                {"withdrawDurationMs", 500}};
+    LiquidityProvider lp;
+    auto c0 = ctxAt(f, 0.0); lp.onStart(c0);
+    { f.advance(100); auto c = ctxAt(f, 0.1); lp.onTick(c); }
+    const size_t afterSeed = f.gateway.submissions.size();
+
+    // Drive well past the end of the withdrawal. The reconcile loop would happily
+    // refill every empty level on the next tick, which would undo the whole event.
+    for (int i = 0; i < 40; ++i) {
+        f.advance(100);
+        auto c = ctxAt(f, 2.0 + i * 0.1);
+        lp.onTick(c);
+    }
+    check(f.gateway.submissions.size() == afterSeed,
+          "no level is re-quoted after being withdrawn (got " +
+              std::to_string(f.gateway.submissions.size() - afterSeed) + " extra)");
+    check(f.tracker.activeCount() == 0, "the book stays empty");
+    std::cout << "  no replenishment after withdrawal checked" << std::endl;
+}
+
+void test_inside_out_pulls_the_touch_first() {
+    Fixture f;
+    f.params = {{"referencePrice", 500.00}, {"bidLevels", 5}, {"askLevels", 5},
+                {"halfSpreadTicks", 1}, {"levelSpacingTicks", 5},
+                {"mode", "withdraw"}, {"withdrawAfterSeconds", 1},
+                {"withdrawDurationMs", 2000}, {"withdrawOrder", "inside_out"}};
+    LiquidityProvider lp;
+    auto c0 = ctxAt(f, 0.0); lp.onStart(c0);
+    { f.advance(100); auto c = ctxAt(f, 0.1); lp.onTick(c); }
+    // 40% through the window: the two innermost levels per side should be gone.
+    f.advance(100); { auto c = ctxAt(f, 1.8); lp.onTick(c); }
+
+    double bestBid = 0.0, bestAsk = 1e9;
+    for (const auto& s : f.gateway.submissions) {
+        if (!f.tracker.isLiveOrder(s.id)) continue;
+        if (s.buy) bestBid = std::max(bestBid, s.price);
+        else       bestAsk = std::min(bestAsk, s.price);
+    }
+    // Pulling from the touch outward must WIDEN the spread, which is the whole point
+    // of this ordering: depth falls and the market visibly gets worse to trade on.
+    check(bestBid > 0.0 && bestBid < 499.99 - 1e-9,
+          "inside-out leaves the best bid further from the reference (got " +
+              std::to_string(bestBid) + ")");
+    check(bestAsk < 1e9 && bestAsk > 500.01 + 1e-9,
+          "inside-out leaves the best ask further from the reference (got " +
+              std::to_string(bestAsk) + ")");
+    std::cout << "  inside-out ordering checked" << std::endl;
+}
+
+void test_outside_in_holds_the_touch() {
+    Fixture f;
+    f.params = {{"referencePrice", 500.00}, {"bidLevels", 5}, {"askLevels", 5},
+                {"halfSpreadTicks", 1}, {"levelSpacingTicks", 5},
+                {"mode", "withdraw"}, {"withdrawAfterSeconds", 1},
+                {"withdrawDurationMs", 2000}, {"withdrawOrder", "outside_in"}};
+    LiquidityProvider lp;
+    auto c0 = ctxAt(f, 0.0); lp.onStart(c0);
+    { f.advance(100); auto c = ctxAt(f, 0.1); lp.onTick(c); }
+    f.advance(100); { auto c = ctxAt(f, 1.8); lp.onTick(c); }
+
+    double bestBid = 0.0, bestAsk = 1e9;
+    int live = 0;
+    for (const auto& s : f.gateway.submissions) {
+        if (!f.tracker.isLiveOrder(s.id)) continue;
+        ++live;
+        if (s.buy) bestBid = std::max(bestBid, s.price);
+        else       bestAsk = std::min(bestAsk, s.price);
+    }
+    check(live < 10, "depth is reduced");
+    // The contrast with inside_out: the touch survives, so the spread looks healthy
+    // while the book behind it is being emptied.
+    check(std::fabs(bestBid - 499.99) < 1e-9, "outside-in keeps the best bid at the touch");
+    check(std::fabs(bestAsk - 500.01) < 1e-9, "outside-in keeps the best ask at the touch");
+    std::cout << "  outside-in ordering checked" << std::endl;
+}
+
 void test_metrics_are_reported() {
     Fixture f;
     f.params = {{"referencePrice", 500.00}, {"bidLevels", 4}, {"askLevels", 4}};
@@ -483,6 +634,12 @@ void run_liquidity_provider_tests() {
     test_ladder_moves_down_as_inventory_grows();
     test_ladder_moves_up_when_short();
     test_no_shift_without_inventory_change();
+    test_withdraw_mode_is_accepted_and_validated();
+    test_withdrawal_does_not_start_early();
+    test_withdrawal_pulls_the_whole_book_progressively();
+    test_withdrawn_levels_are_not_replenished();
+    test_inside_out_pulls_the_touch_first();
+    test_outside_in_holds_the_touch();
     test_metrics_are_reported();
 
     if (failures != 0) {

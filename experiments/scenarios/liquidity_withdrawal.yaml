@@ -1,0 +1,60 @@
+# Experiment 18 — Liquidity withdrawal.
+#
+# The provider pulls its book at T+20. Nothing else changes: the noise traders keep
+# trading exactly as before.
+#
+# This is the case that justifies keeping Level 2 data at all. Cancelling orders
+# produces NO trades, so the tape and the candles barely register the event, while
+# displayed depth collapses and the spread blows out. A demonstration judged on
+# candles alone would conclude that nothing happened.
+#
+# The withdrawal is inside-out — nearest the touch first — which is the usual crisis
+# behavior and makes the spread widen progressively rather than all at once.
+
+extends: baselines/normal_market.yaml
+name: liquidity_withdrawal
+description: Provider withdraws its book at T+20 while background flow continues.
+duration_seconds: 45
+
+engine:
+  bbo_interval_ms: 20
+recorder:
+  l2_interval_ms: 25
+
+participants:
+  - id: lp1
+    config:
+      mode: withdraw
+      withdrawAfterSeconds: 19    # lp1 starts at T+1, so this is T+20 on the run clock
+      withdrawDurationMs: 4000
+      withdrawOrder: inside_out
+
+markers:
+  - { at: 20, label: WITHDRAW }
+  # Split the regime comparison where the 4s withdrawal has finished, so the two
+  # windows are settled regimes rather than one of them containing the transition.
+  - { at: 24, label: WITHDRAWN, split: true }
+
+hypothesis:
+  statement: >
+    The order book registers a crisis and the candles do not. Displayed depth falls
+    sharply and the spread widens, while trading continues and the candle range does
+    NOT increase — so a candle-only view would read the event as a quiet period
+    rather than a liquidity failure.
+  expect:
+    # Book space: the event is unmistakable.
+    - { metric: regime.ratio.bid_depth,    op: "<=", value: 0.6 }
+    - { metric: regime.ratio.ask_depth,    op: "<=", value: 0.6 }
+    - { metric: regime.ratio.spread_ticks, op: ">=", value: 1.3 }
+    # Tape space: trading continues, so the comparison is between two live regimes.
+    - { metric: regime.after.trades,       op: ">",  value: 5 }
+    # The claim that matters. Candles must not get MORE dramatic; if anything the
+    # thinner book trades less and the candles look calmer, which is precisely why
+    # judging a liquidity event on candles alone is misleading.
+    - { metric: regime.ratio.candle_range_ticks, op: "<=", value: 1.2 }
+
+# Note on the depth floor: displayed depth does not fall to zero after the provider
+# withdraws, because the noise traders leave resting passive orders behind. What is
+# left is background residue rather than a maintained book -- fewer levels, ragged,
+# and not replenished. That is a realistic depiction of a market with no dedicated
+# liquidity provider, and it is why the threshold above is 0.6 rather than near zero.

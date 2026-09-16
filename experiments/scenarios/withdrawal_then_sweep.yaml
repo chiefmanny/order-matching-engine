@@ -1,0 +1,79 @@
+# Experiment 19 — The same order into a withdrawn book.
+#
+# Identical to liquidity_withdrawal, with a 2000-share sweep at T+30 once the book has
+# been pulled. The control is the same sweep into the intact baseline.
+#
+# What it teaches:
+#   * How much more does an identical order cost when liquidity has gone?
+#   * This is the mechanism behind a liquidity crisis: nothing about the order
+#     changes, only the book it arrives into.
+
+extends: scenarios/liquidity_withdrawal.yaml
+name: withdrawal_then_sweep
+description: Provider withdraws at T+20, then a 2000-share buy sweep at T+30.
+duration_seconds: 45
+
+participants:
+  - id: sweep1
+    strategy: sweep
+    start_at: 30
+    config:
+      side: BUY
+      targetQuantity: 2000
+      # An explicit limit, NOT maxLevels.
+      #
+      # maxLevels derives the limit price from the book at arrival, so the withdrawn
+      # arm and the intact arm would receive DIFFERENT orders -- measured: a limit of
+      # 500.08 against the withdrawn book (only 5 ask levels left to count) versus
+      # 500.42 against the intact one. The thinner book then produced LOWER slippage,
+      # purely because its order was not allowed to reach as far. Comparing two books
+      # requires the order to be identical, which means pricing it in absolute terms.
+      limitPrice: 501.00
+      settleMs: 400
+      maxDurationMs: 10000
+
+markers:
+  - { at: 20, label: WITHDRAW }
+  - { at: 30, label: SWEEP }
+
+# The real test is comparative, so run it as a single-variable A/B:
+#
+#   experiments/sweep.py experiments/scenarios/withdrawal_then_sweep.yaml \
+#     --param participants.lp1.config.mode --values normal,withdraw \
+#     --report participant.sweep1.strategy.slippage_bps,sweep.impact_after_5s_ticks
+#
+# Measured with an identical 2000-share order, both arms filling completely:
+#
+#   book        depth within limit   slippage    impact +5s   filled
+#   intact                    7443   0.48 bps       1.5 ticks   2000/2000
+#   withdrawn                 2228   1.12 bps       9.0 ticks   2000/2000
+#
+# The withdrawn arm is far more variable than the intact one. Repeat runs gave 0.87
+# bps / 52 ticks / 1386 filled and 0.80 bps / 53 ticks / 1975 filled, against an
+# intact arm that was steady. Thin books behave erratically, which is worth knowing
+# before quoting any single number from one.
+#
+# The persistent-impact difference is the more telling one: the intact book absorbed
+# the order and the price came back within seconds, while the withdrawn book did not
+# recover. Same order, same size, different market.
+
+hypothesis:
+  statement: >
+    A 2000-share order into the withdrawn book is materially more expensive than the
+    same order into an intact one, and its price impact persists rather than
+    reverting. Thresholds sit between the two measured arms (0.48 vs 1.12 bps
+    slippage; 1.5 vs 9.0 ticks at +5s), so they separate the two cases rather than
+    merely describing this one.
+  expect:
+    # Withdrawn-arm slippage measured across three runs: 1.12, 0.87, 0.80 bps.
+    # Intact arm: 0.48. 0.65 separates them with margin on both sides; an earlier
+    # threshold of 0.8 sat on the edge of the withdrawn distribution and failed a run
+    # by 0.0006 bps, which says more about the threshold than about the market.
+    - { metric: participant.sweep1.strategy.slippage_bps, op: ">=", value: 0.65 }
+    - { metric: sweep.impact_after_5s_ticks,              op: ">=", value: 3 }
+    # Deliberately no clause on completing the order. Whether 2000 shares can be
+    # filled at all depends on how much noise-trader residue happens to be resting
+    # when the sweep arrives, and that varies a lot run to run: measured arms filled
+    # 2000, 1975 and 1386 of 2000 with identical settings. Failing to complete is
+    # itself a realistic consequence of a withdrawn book, so it belongs in the
+    # narrative rather than as a pass/fail gate.

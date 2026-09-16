@@ -122,6 +122,41 @@ def _mm_section(values: dict) -> list[str]:
     return lines
 
 
+REGIME_ROWS = [
+    ("bid_depth", "bid depth"),
+    ("ask_depth", "ask depth"),
+    ("bid_levels", "bid levels"),
+    ("spread_ticks", "spread (ticks)"),
+    ("spread_max_ticks", "max spread (ticks)"),
+    ("two_sided_fraction", "two-sided"),
+    ("trade_rate_per_s", "trades/s"),
+    ("candle_range_ticks", "1s candle range"),
+    ("realized_vol_bps", "realised vol (bps)"),
+]
+
+
+def _regime_section(values: dict) -> list[str]:
+    """Before/after table across the scenario marker.
+
+    Printed as book-space rows first, then tape-space, because the interesting cases
+    are the ones where those two disagree.
+    """
+    if "regime.marker" not in values:
+        return []
+    lines = [f"    split at T+{values['regime.split_at_s']}s "
+             f"({values['regime.marker']})",
+             f"    {'':<22}{'before':>12}{'after':>12}{'ratio':>10}"]
+    for key, label in REGIME_ROWS:
+        before = values.get(f"regime.before.{key}")
+        after = values.get(f"regime.after.{key}")
+        if before is None and after is None:
+            continue
+        ratio = values.get(f"regime.ratio.{key}")
+        lines.append(f"    {label:<22}{str(before):>12}{str(after):>12}"
+                     f"{('x' + str(ratio)) if ratio is not None else '':>10}")
+    return lines
+
+
 def report(run, values: dict, verdict: dict) -> None:
     print(f"=== {run.name} ===")
     desc = run.metadata.get("description", "")
@@ -137,6 +172,12 @@ def report(run, values: dict, verdict: dict) -> None:
         for key, label in SWEEP_HEADLINE:
             if key in values:
                 print(f"    {label:<28} {values[key]}")
+
+    regime_lines = _regime_section(values)
+    if regime_lines:
+        print("\n  regime change:")
+        for line in regime_lines:
+            print(line)
 
     mm_lines = _mm_section(values)
     if mm_lines:
