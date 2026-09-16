@@ -1,0 +1,45 @@
+# Experiment 9 — Sweep size ladder.
+#
+# The core relationship of the whole suite: quantity -> levels consumed -> slippage
+# -> price impact -> recovery time.
+#
+# Runs against deep_market rather than normal_market. Experiment 9 on the shallower
+# book established why: past ~40% of displayed depth a sweep stops walking the book
+# and starts annihilating it, fill rate collapses, and the numbers stop describing a
+# liquidity-taking event. With ~24k per side, quantities up to 10k stay inside the
+# range where the relationship is interpretable.
+#
+#   experiments/sweep.py experiments/scenarios/sweep_size_ladder.yaml \
+#     --param participants.sweep1.config.targetQuantity \
+#     --values 1000,2500,5000,10000
+#
+# then plot the curve:
+#
+#   experiments/compare.py experiments/results/_sweeps/sweep_targetQuantity_*/run_001 \
+#     --metrics sweep.peak_impact_ticks,sweep.depth_consumed \
+#     --curve sweep.peak_impact_ticks
+
+extends: baselines/deep_market.yaml
+name: sweep_size_ladder
+description: Unsliced buy sweep into the deep control market; quantity is the variable.
+duration_seconds: 45
+
+participants:
+  - id: sweep1
+    strategy: sweep
+    start_at: 25
+    config:
+      side: BUY
+      targetQuantity: 2500
+      maxLevels: 20
+      settleMs: 400
+
+markers:
+  - { at: 25, label: SWEEP }
+
+hypothesis:
+  statement: >
+    Larger orders reach further into the book, so both slippage and peak price impact
+    increase with quantity, and liquidity takes longer to come back.
+  expect:
+    - { metric: sweep.depth_consumed, op: ">", value: 0 }

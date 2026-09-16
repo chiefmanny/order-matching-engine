@@ -144,7 +144,13 @@ def compute(run, tick: float) -> dict:
                 if post_sizes.get(price, 0) < size))
             out["sweep.pre_levels"] = int(len(pre_sizes))
 
-            pre_depth = float(pre_rows["size"].sum())
+            # Pre-sweep depth from a short median, not a single snapshot: the same
+            # one-snapshot gaps described below can land immediately before the event.
+            pre_window = l2[(l2["ts_ns"] <= start_ns) & (l2["side"] == consumed_side)]
+            pre_series = (pre_window.groupby("snapshot_id")["size"].sum()
+                          .tail(9)) if not pre_window.empty else pd.Series(dtype=float)
+            pre_depth = (float(pre_series.median()) if not pre_series.empty
+                         else float(pre_rows["size"].sum()))
             post_depth = float(post_rows["size"].sum())
             out["sweep.pre_depth"] = int(pre_depth)
             out["sweep.post_depth"] = int(post_depth)
@@ -158,11 +164,33 @@ def compute(run, tick: float) -> dict:
                         (l2["ts_ns"] <= end_ns + lookahead_ns) &
                         (l2["side"] == consumed_side)]
             if not window.empty:
-                trough = float(window.groupby("snapshot_id")["size"].sum().min())
+                series = window.groupby("snapshot_id")["size"].sum().sort_index()
+                # A plain minimum is not usable here. The liquidity provider cancels
+                # and re-submits its whole ladder when its inventory skew shifts, so a
+                # Level 2 poll landing mid-rebuild sees a near-empty book. Measured on
+                # a real run: median ask depth 24493, minimum 1533 -- a 94% "collapse"
+                # that lasted exactly one 25ms snapshot, and made a 1000-share sweep
+                # report consuming 17917 shares. Raising the sampling rate made these
+                # far more likely to be caught, not less.
+                #
+                # A genuine sweep's reduction persists until replenishment (hundreds
+                # of ms, tens of snapshots), so a 3-wide rolling median erases the
+                # single-snapshot artifacts while preserving real depletion.
+                smoothed = series.rolling(3, center=True, min_periods=1).median()
+                trough = float(smoothed.min())
                 out["sweep.trough_depth"] = int(trough)
                 out["sweep.depth_consumed"] = int(max(0.0, pre_depth - trough))
+                out["sweep.raw_min_depth"] = int(series.min())
             else:
                 out["sweep.depth_consumed"] = int(max(0.0, pre_depth - post_depth))
+
+            # Note what depth_consumed means: the PEAK DRAWDOWN of displayed depth,
+            # not the cumulative liquidity the sweep took. When the provider
+            # replenishes while the sweep is still executing, the book refills as
+            # fast as it is eaten and the drawdown understates total consumption --
+            # e.g. a 2500-share sweep that fully filled showed only 714 of drawdown.
+            # For "how much was taken", use filled_quantity or volume_during; this
+            # metric answers "how thin did the book actually get".
 
             # --- depth recovery ---------------------------------------
             # Time until the consumed side climbs back to 90% of its pre-sweep depth.
