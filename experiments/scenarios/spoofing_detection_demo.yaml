@@ -1,0 +1,75 @@
+# Experiment — Layering, and what it looks like to surveillance.
+#
+# An educational demonstration in an isolated synthetic market. The subject is not the
+# pattern but its DETECTION: the point is that a small set of behavioural measures,
+# applied uniformly to every participant, separates the layering actor from the
+# genuine ones without anyone being told which is which.
+#
+# Read surveil.* in the analysis output. The interesting comparison is against lp1,
+# which also cancels heavily — because cancelling heavily is what quoting IS.
+#
+# That comparison is not hypothetical. The first version of the anomaly score here
+# used cancel ratio, order-to-trade ratio and relative size, and it ranked lp1 as the
+# MOST anomalous participant in the run, ahead of the layering actor:
+#
+#   participant   cancel   fill   order/trade   size   lifetime CV
+#   layerer        0.833  0.344           2.9   1700         0.431
+#   lp1            0.999  0.070          14.3    500         1.168
+#
+# The provider cancels more, and replaces orders far more often, because continuous
+# quoting means continuously requoting. Judged on those measures alone the honest
+# participant looks worse than the manipulative one -- which is exactly the false
+# positive real surveillance has to avoid, reproduced here by accident.
+#
+# The measure that actually separates them is REGULARITY: the provider's order
+# lifetimes track the market (CV 1.17), while the layering actor's are set by a timer
+# (CV 0.43). Mechanical uniformity, combined with unusually large displayed size, is
+# the fingerprint. That is the lesson this scenario is really for.
+#
+# This runs only against the simulated engine with simulated participants.
+
+extends: baselines/normal_market.yaml
+name: spoofing_detection_demo
+description: Layering actor alongside genuine participants, for surveillance metrics.
+duration_seconds: 50
+
+engine:
+  bbo_interval_ms: 20
+recorder:
+  l2_interval_ms: 25
+
+participants:
+  - id: layerer
+    strategy: layering_demo
+    start_at: 12
+    config:
+      side: BUY
+      layers: 5
+      # Deliberately large next to the provider's ~500 and the noise traders' ~100.
+      layerSize: 2000
+      startOffsetTicks: 2
+      layerSpacingTicks: 2
+      holdMs: 700
+      cycleIntervalMs: 1800
+      tradeOpposite: true
+      opposingSize: 200
+
+markers:
+  - { at: 12, label: LAYERING, split: true }
+
+hypothesis:
+  statement: >
+    The layering actor is separable from every genuine participant on behavioural
+    measures alone: it withdraws essentially everything it posts, trades almost none
+    of it, and shows the highest combined anomaly score in the run.
+  expect:
+    # The LAYERS specifically are all withdrawn and none of them trade. The actor's
+    # aggregate fill ratio is NOT near zero (~0.34) and should not be expected to be:
+    # one order in six is the small opposing trade, which is meant to fill. Measuring
+    # the aggregate would have quietly tested the wrong thing.
+    - { metric: participant.layerer.strategy.layer_cancel_ratio, op: ">=", value: 0.95 }
+    - { metric: participant.layerer.strategy.layers_filled_shares, op: "==", value: 0 }
+    - { metric: surveil.most_anomalous,   op: "==", value: "layerer" }
+    # A clear margin over the next participant is what makes the demonstration
+    # legible; a narrow one would mean the metrics are not really discriminating.
+    - { metric: surveil.score_separation, op: ">=", value: 2.0 }

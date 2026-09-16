@@ -46,6 +46,7 @@ target_link_libraries(core_lib PUBLIC Threads::Threads)
 set(PARTICIPANT_BASE_SOURCES
     src/clients/common/event_log.cpp
     src/clients/common/strategies/echo_strategy.cpp
+    src/clients/common/strategies/layering_demo.cpp
     src/clients/common/strategies/liquidity_provider.cpp
     src/clients/common/strategies/directional_trader.cpp
     src/clients/common/strategies/market_maker.cpp
@@ -77,6 +78,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/unit/participant_tests_main.cpp)
     add_executable(participant_tests
         tests/unit/participant_tests_main.cpp
         tests/unit/test_event_log.cpp
+        tests/unit/test_layering_demo.cpp
         tests/unit/test_liquidity_provider.cpp
         tests/unit/test_directional_trader.cpp
         tests/unit/test_market_maker.cpp

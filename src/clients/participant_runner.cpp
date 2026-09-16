@@ -19,6 +19,7 @@
 #include "participant_runtime.h"
 #include "strategy.h"
 #include "strategies/echo_strategy.h"
+#include "strategies/layering_demo.h"
 #include "strategies/liquidity_provider.h"
 #include "strategies/directional_trader.h"
 #include "strategies/market_maker.h"
@@ -39,6 +40,7 @@ using StrategyFactory = std::function<std::unique_ptr<Strategy>()>;
 const std::map<std::string, StrategyFactory>& registry() {
     static const std::map<std::string, StrategyFactory> kRegistry = {
         {"echo", [] { return std::make_unique<EchoStrategy>(); }},
+        {"layering_demo", [] { return std::make_unique<LayeringDemo>(); }},
         {"liquidity_provider", [] { return std::make_unique<LiquidityProvider>(); }},
         {"directional_trader", [] { return std::make_unique<DirectionalTrader>(); }},
         {"market_maker", [] { return std::make_unique<MarketMaker>(); }},

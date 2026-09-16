@@ -6,8 +6,8 @@ directly by string and analyze.py can evaluate them without special-casing.
 """
 from __future__ import annotations
 
-from . import (baseline, directional, market_maker, order_flow, participant,
-               regime, sweep)
+from . import (baseline, directional, manipulation, market_maker, order_flow,
+               participant, regime, sweep)
 
 
 def compute_all(run, tick_size: float | None = None) -> dict:
@@ -20,4 +20,5 @@ def compute_all(run, tick_size: float | None = None) -> dict:
     out.update(market_maker.compute(run, tick))
     out.update(regime.compute(run, tick))
     out.update(directional.compute(run, tick))
+    out.update(manipulation.compute(run, tick))
     return out

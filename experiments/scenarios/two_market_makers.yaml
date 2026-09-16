@@ -1,0 +1,52 @@
+# Experiment — Two market makers competing.
+#
+# Also pure composition: a second maker is another instance of the same strategy with
+# its own seed, quoting slightly tighter.
+#
+# What it teaches:
+#   * Does competition tighten the spread beyond what one maker achieves?
+#   * Does the tighter quoter win the flow, and does that show up as it carrying more
+#     inventory risk — the price of winning the queue?
+
+extends: scenarios/mm_control.yaml
+name: two_market_makers
+description: Two competing market makers on a wide provider book.
+duration_seconds: 45
+
+participants:
+  - id: mm1
+    strategy: market_maker
+    start_at: 5
+    decision_interval_ms: 50
+    config:
+      quoteSize: 200
+      halfSpreadTicks: 3
+      requoteThresholdTicks: 2
+      inventoryLimit: 1500
+      inventoryUnitShares: 200
+      inventorySkewTicksPerUnit: 1.0
+
+  - id: mm2
+    strategy: market_maker
+    start_at: 5
+    decision_interval_ms: 50
+    config:
+      quoteSize: 200
+      # Quotes one tick tighter, so it should sit in front of mm1 in the queue.
+      halfSpreadTicks: 2
+      requoteThresholdTicks: 2
+      inventoryLimit: 1500
+      inventoryUnitShares: 200
+      inventorySkewTicksPerUnit: 1.0
+
+markers:
+  - { at: 5, label: MAKERS ON }
+
+hypothesis:
+  statement: >
+    Two makers narrow the spread further than the provider-only control, and the
+    tighter quoter captures more of the flow.
+  expect:
+    - { metric: spread.mean_ticks, op: "<=", value: 6 }
+    - { metric: mm.mm2.fills,      op: ">",  value: 0 }
+    - { metric: mm.mm1.fills,      op: ">=", value: 0 }

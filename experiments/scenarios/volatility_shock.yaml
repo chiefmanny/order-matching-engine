@@ -1,0 +1,119 @@
+# Experiment 20 — Volatility shock, composed.
+#
+# There is no volatility_shock participant, and that is the point. The shock is made
+# entirely out of actors that already exist, each doing its ordinary job:
+#
+#   * one liquidity provider WITHDRAWS its book, so the same order flow suddenly
+#     lands on far less depth (the remaining provider is deliberately thin)
+#   * a directional trader supplies sustained aggressive pressure
+#   * the noise traders raise their cancellation rate, so resting liquidity churns
+#     and is less reliable than it looks
+#
+# Volatility is the emergent result of those three interacting, not a behavior any
+# one of them implements. If this needed a bespoke participant, the architecture
+# would be wrong -- the whole approach rests on market events being compositions.
+
+extends: baselines/normal_market.yaml
+name: volatility_shock
+description: Thin book plus aggressive flow plus heavy cancellation — shock by composition.
+duration_seconds: 50
+
+engine:
+  bbo_interval_ms: 20
+recorder:
+  l2_interval_ms: 25
+
+participants:
+  # The book that stays: thin, and thin is configuration rather than a mode.
+  - id: lp1
+    config:
+      bidLevels: 4
+      askLevels: 4
+      averageQuantity: 150
+      quantityVariance: 50
+      replenishDelayMs: 900
+
+  # The book that LEAVES. Before the shock this supplies most of the depth, so the
+  # pre-shock market is ordinary; at T+20 it withdraws, and the book thins at the
+  # same moment the aggressive flow arrives. That ordering matters: a book that is
+  # already thin before the event gives the comparison nothing to measure against,
+  # and real books thin out during a shock rather than beforehand.
+  - id: lp2
+    strategy: liquidity_provider
+    start_at: 1
+    config:
+      referencePrice: 500.00
+      bidLevels: 10
+      askLevels: 10
+      halfSpreadTicks: 2
+      levelSpacingTicks: 4
+      averageQuantity: 600
+      quantityVariance: 150
+      replenishDelayMs: 400
+      inventorySkewTicksPerUnit: 4.0
+      mode: withdraw
+      withdrawAfterSeconds: 19
+      withdrawDurationMs: 2500
+      withdrawOrder: inside_out
+
+  - id: noise1
+    config:
+      cancelProbability: 0.6
+      orderIntervalMs: 150
+  - id: noise2
+    config:
+      cancelProbability: 0.6
+      orderIntervalMs: 170
+
+  - id: shock
+    strategy: directional_trader
+    start_at: 20
+    stop_at: 34
+    config:
+      side: BUY
+      orderSize: 150
+      arrivalIntervalMs: 700
+      intervalJitterMs: 200
+      aggressiveness: 1.0
+      durationSeconds: 12
+      priceLimit: 515.00
+      residualCancelMs: 600
+
+markers:
+  - { at: 20, label: SHOCK, split: true }
+
+# A first version of this scenario had the book thin from the very start, with only
+# the aggressive flow timed to the marker. Measured across three runs, that produced
+# no reliable volatility signal at all -- realised vol ratio 1.05 +/- 0.23 and
+# excursion 8.5 +/- 9.4, both indistinguishable from noise, with only trade rate
+# (1.365 +/- 0.11) holding up. A single earlier run had shown 1.77 and 44.5, which
+# was simply an outlier from an erratic thin book.
+#
+# By the calibration criteria that is "too weak: the intended event cannot be
+# distinguished from baseline", and the fix is structural rather than a lower
+# threshold. Timing the withdrawal to the shock gives the split an ordinary market to
+# compare against, which is both a stronger contrast and a more faithful depiction.
+
+# Measured across repeat runs of the restructured scenario:
+#
+#   realised vol ratio      7.9  +/- 5.7
+#   depth ratio            0.32  +/- 0.06     (tight and reliable)
+#   trade rate ratio        1.30 +/- 0.08     (tight and reliable)
+#   mid excursion delta      337 +/- 390      (enormous spread)
+#
+# Thresholds sit at the LOW end of each distribution rather than near the mean, so a
+# pass means the effect survived an unlucky run. Excursion is deliberately not a gate
+# despite being the most dramatic number: its spread is as large as its mean, so it
+# describes the run that happened rather than the scenario.
+
+hypothesis:
+  statement: >
+    Withdrawing depth at the same moment aggressive flow arrives produces a genuine
+    volatility shock — depth collapses, realised volatility multiplies, and trading
+    intensifies. All of it emerges from ordinary participants interacting; there is
+    no shock actor.
+  expect:
+    - { metric: regime.ratio.bid_depth,        op: "<=", value: 0.6 }
+    - { metric: regime.ratio.realized_vol_bps, op: ">=", value: 2.0 }
+    - { metric: regime.ratio.trade_rate_per_s, op: ">=", value: 1.15 }
+    - { metric: regime.after.trades,           op: ">",  value: 10 }
