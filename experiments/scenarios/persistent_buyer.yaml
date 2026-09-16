@@ -1,0 +1,82 @@
+# Experiment 14 — Persistent buying pressure.
+#
+# A steady stream of aggressive buy orders for 15 seconds, against the calibrated
+# baseline. Deliberately NOT a sweep: a sweep asks how far one large order reaches
+# into the book right now, whereas this asks whether repeated pressure moves price
+# PERSISTENTLY. A book that comfortably absorbs one big order can still be walked by
+# a steady stream of small ones, because the provider's inventory response accumulates.
+#
+# What it teaches:
+#   * Does sustained order-flow imbalance move price, or is it absorbed?
+#   * Is the move persistent, or does price snap back once pressure stops?
+#
+# ---------------------------------------------------------------------------
+# Intensity calibration, and a structural caveat
+# ---------------------------------------------------------------------------
+# Swept arrivalIntervalMs:
+#
+#   interval   volume share   peak move   persistence
+#      300ms          0.70    282 ticks          4.43
+#      900ms          0.55      9 ticks          1.00
+#     2000ms          0.32      4.5 ticks        0.89
+#
+# 900ms is the setting used here: the move is unmistakable and fully persistent
+# without the actor overwhelming the market.
+#
+# The 300ms row is not a bigger version of the same thing, it is a runaway. A
+# persistence above 1 means price kept climbing AFTER the pressure stopped, and the
+# mechanism is a feedback loop: the buyer lifts the book, the provider is forced
+# short, its inventory skew raises its quotes, which raises the mid, which raises the
+# provider's own re-centring reference. Nothing pulls back.
+#
+# That is worth stating plainly: this market has no fundamental anchor. There is no
+# informed trader or arbitrageur with a view on value, so a large enough directional
+# push reprices it permanently and without bound. The behavior is mechanically
+# correct for the participants present, but it is a property of who is in the market
+# rather than a realistic depiction of one. A mean-reverting or value-anchored actor
+# would be the thing to add if a scenario ever needs impact to decay.
+
+extends: baselines/normal_market.yaml
+name: persistent_buyer
+description: Sustained aggressive buying for 15s against the calibrated baseline.
+duration_seconds: 50
+
+engine:
+  bbo_interval_ms: 20
+recorder:
+  l2_interval_ms: 25
+
+participants:
+  - id: buyer
+    strategy: directional_trader
+    start_at: 20
+    stop_at: 36
+    config:
+      side: BUY
+      orderSize: 200
+      arrivalIntervalMs: 900
+      intervalJitterMs: 200
+      aggressiveness: 1.0
+      durationSeconds: 15
+      # Without a limit a persistent taker chases a thinning book indefinitely, which
+      # measures the limit's absence rather than the market's depth.
+      priceLimit: 520.00
+      residualCancelMs: 800
+
+markers:
+  - { at: 20, label: BUY PRESSURE, split: true }
+
+hypothesis:
+  statement: >
+    Sustained one-sided buying produces a positive order-flow imbalance and moves the
+    mid upward materially more than the baseline's ordinary drift, while trading
+    continues throughout.
+  expect:
+    - { metric: flow.signed_imbalance,        op: ">=", value: 0.15 }
+    # Price must move WHILE the pressure is applied...
+    - { metric: flow.buyer.peak_move_ticks,   op: ">=", value: 3 }
+    # ...and some of it must survive once the pressure stops. Persistence separates
+    # a real repricing from a temporary dislocation that snaps straight back; it is
+    # the whole question this experiment exists to answer.
+    - { metric: flow.buyer.persistence,       op: ">=", value: 0.2 }
+    - { metric: regime.after.trades,          op: ">",  value: 10 }

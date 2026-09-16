@@ -20,6 +20,7 @@
 #include "strategy.h"
 #include "strategies/echo_strategy.h"
 #include "strategies/liquidity_provider.h"
+#include "strategies/directional_trader.h"
 #include "strategies/market_maker.h"
 #include "strategies/noise_trader.h"
 #include "strategies/sweep.h"
@@ -39,10 +40,11 @@ const std::map<std::string, StrategyFactory>& registry() {
     static const std::map<std::string, StrategyFactory> kRegistry = {
         {"echo", [] { return std::make_unique<EchoStrategy>(); }},
         {"liquidity_provider", [] { return std::make_unique<LiquidityProvider>(); }},
+        {"directional_trader", [] { return std::make_unique<DirectionalTrader>(); }},
         {"market_maker", [] { return std::make_unique<MarketMaker>(); }},
         {"noise_trader", [] { return std::make_unique<NoiseTrader>(); }},
         {"sweep", [] { return std::make_unique<Sweep>(); }},
-        // Phase 9+: directional_trader, parent_executor each add one line here.
+        // Phase 11+: parent_executor and later actors each add one line here.
     };
     return kRegistry;
 }

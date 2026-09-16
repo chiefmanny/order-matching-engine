@@ -1,0 +1,46 @@
+# Experiment 16 — Market maker under sustained buying pressure.
+#
+# persistent_buyer with a market maker added. The maker quotes at the touch
+# (halfSpreadTicks 1) so it competes with the provider for the incoming flow rather
+# than sitting behind it and never trading.
+#
+# What it teaches:
+#   * A maker facing persistent one-way flow is repeatedly lifted on its ASK, so it
+#     accumulates SHORT inventory. The sign is the whole point: a maker does not
+#     choose its position, the flow chooses it.
+#   * Does the inventory skew engage, and does the hard limit hold?
+#   * Adverse selection should be clearly positive here — every fill is followed by
+#     the market continuing in the direction that hurt it.
+
+extends: scenarios/persistent_buyer.yaml
+name: mm_under_buy_pressure
+description: Sustained buying against a book that includes an inventory-aware maker.
+
+participants:
+  - id: mm1
+    strategy: market_maker
+    start_at: 5
+    decision_interval_ms: 50
+    config:
+      quoteSize: 200
+      halfSpreadTicks: 1
+      requoteThresholdTicks: 2
+      requoteIntervalMs: 100
+      inventoryLimit: 1200
+      inventoryUnitShares: 200
+      inventorySkewTicksPerUnit: 1.0
+      maxInventorySkewTicks: 15
+
+markers:
+  - { at: 20, label: BUY PRESSURE, split: true }
+
+hypothesis:
+  statement: >
+    The maker is lifted repeatedly and ends up short, its skew engages, its inventory
+    stays inside the configured limit, and it is adversely selected — the market keeps
+    moving against it after each fill.
+  expect:
+    - { metric: mm.mm1.inventory_min, op: "<=", value: -200 }
+    - { metric: mm.mm1.inventory_min, op: ">=", value: -1500 }
+    - { metric: participant.mm1.strategy.max_abs_skew_ticks, op: ">", value: 0 }
+    - { metric: mm.mm1.adverse_selection_1s_ticks, op: ">", value: 0 }

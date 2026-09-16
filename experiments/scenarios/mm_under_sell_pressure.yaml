@@ -1,0 +1,28 @@
+# Experiment 17 — Market maker under sustained selling pressure.
+#
+# The mirror of Experiment 16, inherited from it so the two cannot drift apart. The
+# maker is now repeatedly HIT on its bid, so it should accumulate LONG inventory —
+# the opposite sign, from the opposite flow, with everything else identical.
+
+extends: scenarios/mm_under_buy_pressure.yaml
+name: mm_under_sell_pressure
+description: Sustained selling against a book that includes an inventory-aware maker.
+
+participants:
+  - id: buyer
+    config:
+      side: SELL
+      priceLimit: 480.00
+
+markers:
+  - { at: 20, label: SELL PRESSURE, split: true }
+
+hypothesis:
+  statement: >
+    Symmetric to the buy case with the inventory sign reversed: the maker is hit on
+    its bid, ends up long, its skew engages, and it is adversely selected.
+  expect:
+    - { metric: mm.mm1.inventory_max, op: ">=", value: 200 }
+    - { metric: mm.mm1.inventory_max, op: "<=", value: 1500 }
+    - { metric: participant.mm1.strategy.max_abs_skew_ticks, op: ">", value: 0 }
+    - { metric: mm.mm1.adverse_selection_1s_ticks, op: ">", value: 0 }

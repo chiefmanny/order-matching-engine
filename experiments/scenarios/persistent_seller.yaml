@@ -1,0 +1,32 @@
+# Experiment 15 — Persistent selling pressure.
+#
+# The mirror image of persistent_buyer, inherited from it so the two cannot drift
+# apart: only `side` and the direction of the expectations differ. Its job is to catch
+# side-specific bugs — anything that works for buyers and not sellers shows up here
+# and nowhere else.
+
+extends: scenarios/persistent_buyer.yaml
+name: persistent_seller
+description: Sustained aggressive selling for 15s against the calibrated baseline.
+
+participants:
+  - id: buyer
+    config:
+      side: SELL
+      priceLimit: 480.00
+
+markers:
+  - { at: 20, label: SELL PRESSURE, split: true }
+
+hypothesis:
+  statement: >
+    Mechanically symmetric to the buy case: sustained selling produces a negative
+    order-flow imbalance and moves the mid downward by a comparable amount.
+  expect:
+    - { metric: flow.signed_imbalance,      op: "<=", value: -0.15 }
+    # peak_move and persistence are signed relative to the pressure's own direction,
+    # so a seller's expectations read identically to the buyer's. That is the point:
+    # any asymmetry in the engine or the strategies shows up as a failure here.
+    - { metric: flow.buyer.peak_move_ticks, op: ">=", value: 3 }
+    - { metric: flow.buyer.persistence,     op: ">=", value: 0.2 }
+    - { metric: regime.after.trades,        op: ">",  value: 10 }

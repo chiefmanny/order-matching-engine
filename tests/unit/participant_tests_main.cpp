@@ -11,6 +11,7 @@
 
 void run_event_log_tests();
 void run_liquidity_provider_tests();
+void run_directional_trader_tests();
 void run_market_maker_tests();
 void run_noise_trader_tests();
 void run_order_tracker_tests();
@@ -24,6 +25,7 @@ int main() {
     std::cout << "=== Participant infrastructure unit tests ===" << std::endl;
     run_event_log_tests();
     run_liquidity_provider_tests();
+    run_directional_trader_tests();
     run_market_maker_tests();
     run_noise_trader_tests();
     run_sweep_tests();

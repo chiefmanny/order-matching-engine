@@ -132,6 +132,8 @@ REGIME_ROWS = [
     ("trade_rate_per_s", "trades/s"),
     ("candle_range_ticks", "1s candle range"),
     ("realized_vol_bps", "realised vol (bps)"),
+    ("mid_change_ticks", "mid change (ticks)"),
+    ("mid_excursion_ticks", "mid excursion (ticks)"),
 ]
 
 
@@ -152,8 +154,34 @@ def _regime_section(values: dict) -> list[str]:
         if before is None and after is None:
             continue
         ratio = values.get(f"regime.ratio.{key}")
-        lines.append(f"    {label:<22}{str(before):>12}{str(after):>12}"
-                     f"{('x' + str(ratio)) if ratio is not None else '':>10}")
+        delta = values.get(f"regime.delta.{key}")
+        if ratio is not None:
+            change = "x" + str(ratio)
+        elif delta is not None:
+            change = f"{delta:+g}"
+        else:
+            change = ""
+        lines.append(f"    {label:<22}{str(before):>12}{str(after):>12}{change:>10}")
+    return lines
+
+
+def _flow_section(values: dict) -> list[str]:
+    """Directional-pressure episodes: temporary vs permanent impact."""
+    pids = sorted({k.split(".")[1] for k in values if k.startswith("flow.")
+                   and k.count(".") >= 2})
+    lines = []
+    for pid in pids:
+        p = f"flow.{pid}"
+        if f"{p}.peak_move_ticks" not in values:
+            continue
+        lines.append(
+            f"    {pid:<10} {values.get(p + '.side', '')}"
+            f"  peak={values.get(p + '.peak_move_ticks')}t"
+            f"  at_end={values.get(p + '.move_at_end_ticks')}t"
+            f"  +5s={values.get(p + '.move_after_5s_ticks', '-')}t"
+            f"  +10s={values.get(p + '.move_after_10s_ticks', '-')}t"
+            f"  persistence={values.get(p + '.persistence', '-')}"
+            f"  vol_share={values.get(p + '.volume_share', '-')}")
     return lines
 
 
@@ -172,6 +200,12 @@ def report(run, values: dict, verdict: dict) -> None:
         for key, label in SWEEP_HEADLINE:
             if key in values:
                 print(f"    {label:<28} {values[key]}")
+
+    flow_lines = _flow_section(values)
+    if flow_lines:
+        print("\n  directional pressure:")
+        for line in flow_lines:
+            print(line)
 
     regime_lines = _regime_section(values)
     if regime_lines:
