@@ -1,0 +1,24 @@
+# PRESET: Large buy sweep
+#
+# The same event an order of magnitude larger, into the deep book so the order is
+# absorbed rather than annihilating the market. Experiment 9 established why the deep
+# baseline is used: past ~40% of displayed depth a sweep stops walking the book.
+extends: baselines/deep_market.yaml
+name: preset_large_buy_sweep
+description: >
+  A 10000-share buy order arrives at once. It reaches far down the ask side,
+  slippage grows faster than the order size, and liquidity takes noticeably longer to
+  return than after a small sweep.
+duration_seconds: 45
+participants:
+  - id: sweep1
+    strategy: sweep
+    start_at: 25
+    config: { side: BUY, targetQuantity: 10000, maxLevels: 20, settleMs: 500 }
+markers:
+  - { at: 25, label: LARGE BUY SWEEP }
+hypothesis:
+  statement: A large sweep consumes multiple levels and produces substantial slippage.
+  expect:
+    - { metric: sweep.depth_consumed, op: ">", value: 0 }
+    - { metric: participant.sweep1.strategy.slippage_bps, op: ">=", value: 1.0 }

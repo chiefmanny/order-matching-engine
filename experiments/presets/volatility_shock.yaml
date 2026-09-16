@@ -1,0 +1,20 @@
+# PRESET: Volatility shock
+#
+# Composed entirely from ordinary participants. There is no shock actor.
+#
+# RELIABILITY. This is the most variable preset in the set, and deliberately kept
+# rather than tuned into looking stable. Measured across repeat runs its realised
+# volatility ratio is 7.9 +/- 5.7 -- the effect is always large, but how large swings
+# widely, because a thin book behaves erratically by nature. Depth collapse (0.32 +/-
+# 0.06) and trade-rate increase (1.30 +/- 0.08) are the dependable parts.
+#
+# Its hypothesis threshold sits at the low end of that distribution, so an unlucky run
+# can still fall short and report partially_consistent. That is the scenario being
+# honest about itself. Anything launching it for a demonstration should expect a
+# dramatic but not reproducible magnitude.
+extends: scenarios/volatility_shock.yaml
+name: preset_volatility_shock
+description: >
+  Liquidity withdraws at the same moment aggressive flow arrives. Depth collapses,
+  price swings sharply, and volatility multiplies — all emerging from the
+  interaction of ordinary participants rather than from any single one.

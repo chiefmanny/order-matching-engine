@@ -1,0 +1,24 @@
+# PRESET: Thin liquidity
+#
+# A market with a sparse book. No event happens; the market is simply worse to trade
+# on, which is the comparison other presets are measured against.
+extends: baselines/normal_market.yaml
+name: preset_thin_liquidity
+description: >
+  The provider shows far less size across fewer levels. Spreads are wider and more
+  erratic, depth is shallow, and the same order flow moves price much more than it
+  would in the normal market.
+duration_seconds: 45
+participants:
+  - id: lp1
+    config:
+      bidLevels: 4
+      askLevels: 4
+      averageQuantity: 150
+      quantityVariance: 50
+      replenishDelayMs: 900
+hypothesis:
+  statement: Displayed depth is a small fraction of the normal market's.
+  expect:
+    - { metric: book.bid_depth, op: "<=", value: 3000 }
+    - { metric: trades.count,   op: ">",  value: 10 }

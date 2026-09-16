@@ -1,0 +1,11 @@
+# PRESET: Normal market
+#
+# The calibrated control. Everything else is a deviation from this, and every other
+# preset inherits its participants unless it says otherwise.
+extends: baselines/normal_market.yaml
+name: preset_normal_market
+description: >
+  An ordinary two-sided market. A liquidity provider maintains a multi-level book
+  while background traders arrive on both sides, producing continuous execution and a
+  price that moves without trending away.
+duration_seconds: 45

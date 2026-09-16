@@ -227,11 +227,20 @@ def finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher,
     if malformed:
         failures.append("malformed_participant_events")
 
-    checks = structural_checks(run_dir, scen, time.time() - started_wall)
+    checks = structural_checks(run_dir, scen, time.time() - started_wall,
+                               sum(phases.values()))
     failures.extend(checks["failures"])
 
     meta["ended_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     meta["wall_seconds"] = round(time.time() - started_wall, 3)
+    # Monotonic total, which excludes any time the host spent suspended. Wall clock
+    # keeps advancing across a sleep and monotonic does not, so the difference between
+    # them is exactly how long the machine was asleep.
+    monotonic_total = round(sum(phases.values()), 3)
+    meta["monotonic_seconds"] = monotonic_total
+    suspended = meta["wall_seconds"] - monotonic_total
+    if suspended > 30.0:
+        meta["host_suspended_seconds"] = round(suspended, 1)
     meta["process_exit_status"] = exit_status
     meta["artifact_summary"] = checks["summary"]
     meta["engine_bbo_interval_ms"] = scen.bbo_interval_ms
@@ -252,14 +261,16 @@ def finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher,
     return 0
 
 
-def structural_checks(run_dir, scen, wall_seconds: float = 0.0) -> dict:  # noqa: C901
+def structural_checks(run_dir, scen, wall_seconds: float = 0.0,
+                      monotonic_seconds: float = 0.0) -> dict:  # noqa: C901
     """Cheap checks that the artifacts are usable at all.
 
     Deliberately structural, not behavioral: whether the market did something
     interesting is the analysis step's job (Phase 5). This only answers "did we
     actually record a market?".
     """
-    summary, failures = {"_wall_seconds": wall_seconds}, []
+    summary, failures = {"_wall_seconds": wall_seconds,
+                         "_monotonic_seconds": monotonic_seconds}, []
 
     def line_count(name: str) -> int:
         path = run_dir.path / name
@@ -292,11 +303,22 @@ def structural_checks(run_dir, scen, wall_seconds: float = 0.0) -> dict:  # noqa
         summary["recorder_duration_seconds"] = round(observed, 1)
         budget = scen.duration_seconds + 30.0
         if observed > budget:
-            # Distinguish the two causes: an orphaned recorder that outlived a normal
-            # run, versus a run whose own teardown dragged on and kept it attached.
-            # They need different fixes, so they must not report as the same failure.
+            # The recorder measures its own lifetime in wall clock, which keeps
+            # advancing while the host is asleep. A suspended machine therefore
+            # inflates it without anything being wrong with the recording -- observed
+            # once at 468s of "recorder duration" for a run whose monotonic phases
+            # summed to 48.6s and whose artifacts were entirely normal.
+            #
+            # Judge against monotonic time, which excludes suspension, and report a
+            # sleep as its own thing rather than as data contamination.
+            monotonic = summary.get("_monotonic_seconds", 0.0)
             wall = summary.get("_wall_seconds", 0.0)
-            if wall and observed <= wall + 5.0:
+            slept = wall - monotonic if wall and monotonic else 0.0
+            effective = observed - slept if slept > 30.0 else observed
+
+            if effective <= budget:
+                summary["host_suspended_seconds"] = round(slept, 1)
+            elif monotonic and effective <= monotonic + 5.0:
                 failures.append("run_exceeded_window")
             else:
                 failures.append("recorder_outlived_run")
@@ -338,6 +360,7 @@ def structural_checks(run_dir, scen, wall_seconds: float = 0.0) -> dict:  # noqa
         failures.append(f"no_metrics_from:{pid}")
 
     summary.pop("_wall_seconds", None)
+    summary.pop("_monotonic_seconds", None)
     return {"summary": summary, "failures": failures}
 
 

@@ -260,7 +260,9 @@ def test_missing_extends_is_reported(tmp: Path) -> None:
 
 def test_shipped_scenarios_all_load() -> None:
     root = Path(__file__).resolve().parent.parent
-    files = sorted(root.glob("scenarios/*.yaml")) + sorted(root.glob("baselines/*.yaml"))
+    files = (sorted(root.glob("scenarios/*.yaml"))
+             + sorted(root.glob("baselines/*.yaml"))
+             + sorted(root.glob("presets/*.yaml")))
     assert files, "no scenarios found to validate"
     for path in files:
         scenario_mod.load(path)

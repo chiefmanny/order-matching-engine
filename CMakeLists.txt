@@ -196,9 +196,6 @@ if(gRPC_FOUND AND Protobuf_FOUND AND PROTOC_PATH AND GRPC_CPP_PLUGIN_PATH)
     # add_executable(throughput_test_1 src/clients/throughput_test_1.cpp)
     # target_link_libraries(throughput_test_1 matching_engine_client_lib)
 
-    add_executable(mean_reversion_client src/clients/mean_reversion_client.cpp)
-    target_link_libraries(mean_reversion_client matching_engine_client_lib)
-
     add_executable(level2fetcher src/clients/level2fetcher.cpp)
     target_link_libraries(level2fetcher matching_engine_client_lib)
 

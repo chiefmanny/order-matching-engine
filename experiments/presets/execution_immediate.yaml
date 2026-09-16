@@ -1,0 +1,12 @@
+# PRESET: Execution - immediate
+#
+# A large parent order sent all at once. Pair with execution_sliced: same quantity,
+# same book, different cost.
+extends: scenarios/execution_comparison.yaml
+name: preset_execution_immediate
+description: >
+  A 5000-share order executed in a single burst. It completes in a fraction of a
+  second and pays the most slippage of any execution style.
+participants:
+  - id: parent
+    config: { mode: immediate }

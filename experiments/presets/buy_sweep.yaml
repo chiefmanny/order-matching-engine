@@ -1,0 +1,24 @@
+# PRESET: Buy sweep (small)
+#
+# A single aggressive buy consumes part of the resting ask side. The minor-event
+# reference point: visible in the book, barely visible in the candles.
+extends: baselines/normal_market.yaml
+name: preset_buy_sweep
+description: >
+  A 1000-share buy order arrives at once and walks into the resting asks. Depth at
+  the touch falls, the price ticks up, and the provider replenishes within a second.
+duration_seconds: 45
+engine: { bbo_interval_ms: 20 }
+recorder: { l2_interval_ms: 25 }
+participants:
+  - id: sweep1
+    strategy: sweep
+    start_at: 25
+    config: { side: BUY, targetQuantity: 1000, maxLevels: 8, settleMs: 400 }
+markers:
+  - { at: 25, label: BUY SWEEP }
+hypothesis:
+  statement: A small sweep consumes displayed depth and moves price modestly.
+  expect:
+    - { metric: sweep.depth_consumed, op: ">", value: 0 }
+    - { metric: participant.sweep1.strategy.filled_quantity, op: ">", value: 500 }

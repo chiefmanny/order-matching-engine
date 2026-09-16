@@ -1,0 +1,12 @@
+# PRESET: Layering and its detection
+#
+# Educational, for an isolated synthetic market. The subject is the DETECTION: which
+# behavioural measures separate a manipulative actor from honest ones, and which
+# misleadingly do not.
+extends: scenarios/spoofing_detection_demo.yaml
+name: preset_spoofing_detection
+description: >
+  A participant repeatedly displays large orders away from the touch and withdraws
+  them without trading, while dealing in small size the other way. The surveillance
+  metrics show how it differs from the genuine participants — and how easily a naive
+  measure mistakes an honest market maker for it instead.

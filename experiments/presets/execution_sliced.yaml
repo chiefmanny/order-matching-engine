@@ -1,0 +1,12 @@
+# PRESET: Execution - sliced
+#
+# The same parent order worked over time. The contrast with execution_immediate is
+# the entire premise of execution algorithms.
+extends: scenarios/execution_comparison.yaml
+name: preset_execution_sliced
+description: >
+  The same 5000-share order delivered as spaced children. It takes far longer but
+  pays a fraction of the slippage, because the book replenishes between slices.
+participants:
+  - id: parent
+    config: { mode: sliced, sliceQuantity: 500, sliceIntervalMs: 400 }

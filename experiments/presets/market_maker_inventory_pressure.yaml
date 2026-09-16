@@ -1,0 +1,10 @@
+# PRESET: Market maker under inventory pressure
+#
+# A market maker facing persistent one-way flow. It does not choose its position --
+# the flow chooses it.
+extends: scenarios/mm_under_buy_pressure.yaml
+name: preset_mm_inventory_pressure
+description: >
+  A market maker quotes both sides while a buyer works steadily against it. Being
+  repeatedly lifted forces it short, its quotes skew to shed the position, and it is
+  adversely selected: the market keeps moving against it after each fill.

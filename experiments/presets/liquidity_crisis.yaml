@@ -1,0 +1,11 @@
+# PRESET: Liquidity crisis
+#
+# The provider withdraws, then the same order arrives into what is left. The clearest
+# demonstration that order size alone does not determine cost: the book it lands in
+# does.
+extends: scenarios/withdrawal_then_sweep.yaml
+name: preset_liquidity_crisis
+description: >
+  The liquidity provider pulls its book, and moments later a 2000-share buy arrives
+  into the remains. The same order that is routine in a healthy market becomes
+  expensive here, and the price impact does not revert.

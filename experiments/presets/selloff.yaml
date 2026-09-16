@@ -1,0 +1,9 @@
+# PRESET: Selloff
+#
+# Sustained one-sided selling rather than a single order. Pressure applied over time
+# moves price persistently, which a single order of the same total size does not.
+extends: scenarios/persistent_seller.yaml
+name: preset_selloff
+description: >
+  A seller works steadily through the bid side for fifteen seconds. Price grinds
+  down rather than gapping, and part of the move remains after the selling stops.
