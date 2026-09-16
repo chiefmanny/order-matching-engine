@@ -1,0 +1,32 @@
+# Control for Experiment 12 — a wide book with no market maker.
+#
+# The calibrated baseline has the liquidity provider quoting at +/-1 tick, which is
+# the tightest a penny grid allows. A market maker has no room to improve on that, so
+# "does the maker narrow the spread?" would be unanswerable by construction.
+#
+# Here the provider sits 8 ticks out, which is also the more realistic division of
+# labour: a deep-book provider rests away from the touch and a maker competes at it.
+# This scenario and baseline_with_mm differ ONLY by the presence of the maker.
+
+extends: baselines/normal_market.yaml
+name: mm_control
+description: Wide provider book plus noise, with no market maker — the Exp 12 control.
+duration_seconds: 45
+
+engine:
+  bbo_interval_ms: 20
+recorder:
+  l2_interval_ms: 25
+
+participants:
+  - id: lp1
+    config:
+      halfSpreadTicks: 8
+      levelSpacingTicks: 5
+
+hypothesis:
+  statement: >
+    With the provider resting 8 ticks from its reference and nobody quoting at the
+    touch, the spread is materially wider than the calibrated baseline's ~1.5 ticks.
+  expect:
+    - { metric: spread.mean_ticks, op: ">=", value: 3 }

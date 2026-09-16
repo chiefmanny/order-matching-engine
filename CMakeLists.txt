@@ -47,6 +47,7 @@ set(PARTICIPANT_BASE_SOURCES
     src/clients/common/event_log.cpp
     src/clients/common/strategies/echo_strategy.cpp
     src/clients/common/strategies/liquidity_provider.cpp
+    src/clients/common/strategies/market_maker.cpp
     src/clients/common/strategies/noise_trader.cpp
     src/clients/common/strategies/sweep.cpp
     src/clients/common/order_tracker.cpp
@@ -76,6 +77,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/unit/participant_tests_main.cpp)
         tests/unit/participant_tests_main.cpp
         tests/unit/test_event_log.cpp
         tests/unit/test_liquidity_provider.cpp
+        tests/unit/test_market_maker.cpp
         tests/unit/test_noise_trader.cpp
         tests/unit/test_sweep.cpp
         tests/unit/test_tick_math.cpp

@@ -1,0 +1,47 @@
+# Experiment 13 — Market maker under a sustained sweep.
+#
+# The sweep is deliberately SLICED rather than a single block. An unsliced sweep
+# completes in about one requote interval, so the maker would supply a single 200-share
+# quote and the experiment would measure nothing about inventory management. Delivered
+# as children over ~2 seconds, the maker requotes repeatedly into the flow and its
+# position is driven somewhere interesting.
+#
+# What it teaches:
+#   * Does the maker absorb part of the shock, or is it simply run over?
+#   * Does its inventory skew visibly engage as it is forced short?
+#   * Does the hard inventory limit withdraw its ask before the position runs away?
+#   * Does the maker's presence reduce the price impact of the same order?
+
+extends: scenarios/baseline_with_mm.yaml
+name: mm_vs_sweep
+description: Wide book plus a market maker, hit by a 3000-share sliced buy sweep.
+duration_seconds: 45
+
+participants:
+  - id: sweep1
+    strategy: sweep
+    start_at: 25
+    config:
+      side: BUY
+      targetQuantity: 3000
+      maxLevels: 20
+      childOrders: true
+      childQuantity: 300
+      childDelayMs: 200
+      settleMs: 400
+      maxDurationMs: 15000
+
+markers:
+  - { at: 5,  label: MM ON }
+  - { at: 25, label: SWEEP }
+
+hypothesis:
+  statement: >
+    The maker supplies a meaningful share of the sweep and is forced short, its
+    inventory skew engages, and its position still stays inside the configured limit
+    because the ask is withdrawn once the limit is reached.
+  expect:
+    - { metric: mm.mm1.inventory_min,   op: "<=", value: -200 }
+    - { metric: mm.mm1.inventory_min,   op: ">=", value: -1800 }
+    - { metric: participant.mm1.strategy.max_abs_skew_ticks, op: ">", value: 0 }
+    - { metric: participant.mm1.strategy.ask_shares_filled,  op: ">", value: 200 }

@@ -79,9 +79,20 @@ def run(args: argparse.Namespace) -> int:
     supervisor = processes.Supervisor()
     failures: list[str] = []
     started_wall = time.time()
+    # Phase timings, so a run that takes far longer than its window can be diagnosed
+    # from the artifacts instead of by re-running it with a stopwatch.
+    phases: dict[str, float] = {}
+    mark = time.monotonic()
+
+    def phase(name: str) -> None:
+        nonlocal mark
+        now = time.monotonic()
+        phases[name] = round(now - mark, 2)
+        mark = now
 
     try:
         launcher.setup(run_dir.path)
+        phase("container_start")
 
         if not wait_for_engine(launcher, scen.symbol):
             failures.append("engine_did_not_start")
@@ -89,7 +100,8 @@ def run(args: argparse.Namespace) -> int:
             if isinstance(launcher, processes.DockerLauncher):
                 (run_dir.logs / "engine.stderr").write_text(launcher.logs())
             return finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher)
-        log("engine is up")
+        phase("engine_ready")
+        log(f"engine is up ({phases['engine_ready']:.1f}s)")
 
         # The recorder attaches BEFORE any participant trades, so the tape has no
         # gap at the start of the run.
@@ -105,7 +117,9 @@ def run(args: argparse.Namespace) -> int:
         if recorder.poll() is not None:
             failures.append("recorder_failed_to_start")
             log("FAILED: recorder exited immediately")
-            return finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher)
+            return finish(run_dir, meta, supervisor, scen, failures, started_wall,
+                          launcher, phases)
+        phase("recorder_attach")
         log("recorder attached")
 
         # --- timeline ------------------------------------------------------
@@ -154,6 +168,7 @@ def run(args: argparse.Namespace) -> int:
 
             time.sleep(0.05)
 
+        phase("experiment_window")
         log(f"T+{scen.duration_seconds:5.1f}s  experiment window complete")
 
     except processes.LaunchError as exc:
@@ -163,23 +178,31 @@ def run(args: argparse.Namespace) -> int:
         log("interrupted — stopping everything")
         failures.append("interrupted")
 
-    return finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher)
+    return finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher, phases)
 
 
-def finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher) -> int:
+def finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher,
+           phases: dict | None = None) -> int:
     """Stop everything, gather artifacts, and judge the run."""
     # Participants first, then the recorder: it must still be listening while the
     # participants cancel their resting orders, or the tape misses the teardown.
     log("stopping participants...")
+    phases = phases if phases is not None else {}
+    teardown_start = time.monotonic()
     participant_procs = [p for p in supervisor.processes if p.name != "recorder"]
     for proc in reversed(participant_procs):
+        began = time.monotonic()
         supervisor.stop(proc)
+        phases[f"stop_{proc.name}"] = round(time.monotonic() - began, 2)
 
     recorder = next((p for p in supervisor.processes if p.name == "recorder"), None)
     if recorder:
         time.sleep(0.5)
+        began = time.monotonic()
         supervisor.stop(recorder)
-    log("stopped")
+        phases["stop_recorder"] = round(time.monotonic() - began, 2)
+    phases["teardown"] = round(time.monotonic() - teardown_start, 2)
+    log(f"stopped ({phases['teardown']:.1f}s)")
 
     exit_status = {}
     for proc in supervisor.processes:
@@ -204,7 +227,7 @@ def finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher) ->
     if malformed:
         failures.append("malformed_participant_events")
 
-    checks = structural_checks(run_dir, scen)
+    checks = structural_checks(run_dir, scen, time.time() - started_wall)
     failures.extend(checks["failures"])
 
     meta["ended_at_utc"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -212,6 +235,7 @@ def finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher) ->
     meta["process_exit_status"] = exit_status
     meta["artifact_summary"] = checks["summary"]
     meta["engine_bbo_interval_ms"] = scen.bbo_interval_ms
+    meta["phase_seconds"] = phases
     meta["malformed_event_lines"] = malformed
     meta["failures"] = failures
     meta["status"] = "ok" if not failures else "failed"
@@ -228,14 +252,14 @@ def finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher) ->
     return 0
 
 
-def structural_checks(run_dir, scen) -> dict:  # noqa: C901
+def structural_checks(run_dir, scen, wall_seconds: float = 0.0) -> dict:  # noqa: C901
     """Cheap checks that the artifacts are usable at all.
 
     Deliberately structural, not behavioral: whether the market did something
     interesting is the analysis step's job (Phase 5). This only answers "did we
     actually record a market?".
     """
-    summary, failures = {}, []
+    summary, failures = {"_wall_seconds": wall_seconds}, []
 
     def line_count(name: str) -> int:
         path = run_dir.path / name
@@ -268,7 +292,14 @@ def structural_checks(run_dir, scen) -> dict:  # noqa: C901
         summary["recorder_duration_seconds"] = round(observed, 1)
         budget = scen.duration_seconds + 30.0
         if observed > budget:
-            failures.append("recorder_outlived_run")
+            # Distinguish the two causes: an orphaned recorder that outlived a normal
+            # run, versus a run whose own teardown dragged on and kept it attached.
+            # They need different fixes, so they must not report as the same failure.
+            wall = summary.get("_wall_seconds", 0.0)
+            if wall and observed <= wall + 5.0:
+                failures.append("run_exceeded_window")
+            else:
+                failures.append("recorder_outlived_run")
         elif observed < scen.duration_seconds * 0.5:
             failures.append("recorder_stopped_early")
     else:
@@ -306,6 +337,7 @@ def structural_checks(run_dir, scen) -> dict:  # noqa: C901
     for pid in silent:
         failures.append(f"no_metrics_from:{pid}")
 
+    summary.pop("_wall_seconds", None)
     return {"summary": summary, "failures": failures}
 
 

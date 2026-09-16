@@ -1,0 +1,46 @@
+# Experiment 12 — Market maker added to a wide book.
+#
+# Identical to mm_control except that a market maker is present. Any difference in
+# spread, depth at the touch, or who captures the flow is attributable to the maker.
+#
+# What it teaches:
+#   * Does the maker materially tighten the spread?
+#   * Does it actually get filled, or is it quoting where nothing trades?
+#   * Does its inventory stay bounded, and does the skew visibly respond?
+#   * Is it adversely selected — are its fills followed by the market moving against it?
+
+extends: scenarios/mm_control.yaml
+name: baseline_with_mm
+description: Wide provider book plus noise, plus one inventory-aware market maker.
+duration_seconds: 45
+
+participants:
+  - id: mm1
+    strategy: market_maker
+    start_at: 5
+    decision_interval_ms: 50
+    config:
+      quoteSize: 200
+      halfSpreadTicks: 2
+      requoteThresholdTicks: 2
+      requoteIntervalMs: 100
+      inventoryLimit: 1500
+      inventoryUnitShares: 200
+      inventorySkewTicksPerUnit: 1.0
+      maxInventorySkewTicks: 15
+      referenceMode: mid
+
+markers:
+  - { at: 5, label: MM ON }
+
+hypothesis:
+  statement: >
+    A maker quoting 2 ticks either side of the mid narrows the spread well below the
+    provider-only control, wins a meaningful share of the flow, and holds its
+    inventory inside its configured limit.
+  expect:
+    - { metric: spread.mean_ticks,                    op: "<=", value: 6 }
+    - { metric: mm.mm1.fills,                         op: ">",  value: 5 }
+    - { metric: mm.mm1.inventory_max,                 op: "<=", value: 1800 }
+    - { metric: mm.mm1.inventory_min,                 op: ">=", value: -1800 }
+    - { metric: participant.mm1.strategy.bid_quoted_fraction, op: ">=", value: 0.5 }

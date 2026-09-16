@@ -107,6 +107,21 @@ SWEEP_HEADLINE = [
 ]
 
 
+def _mm_section(values: dict) -> list[str]:
+    """Per-maker lines, discovered from the metric names rather than hardcoded."""
+    prefixes = sorted({k.split(".")[1] for k in values if k.startswith("mm.")})
+    lines = []
+    for pid in prefixes:
+        p = f"mm.{pid}"
+        lines.append(
+            f"    {pid:<10} fills={values.get(p + '.fills', 0):<4}"
+            f" inv[{values.get(p + '.inventory_min', 0)},{values.get(p + '.inventory_max', 0)}]"
+            f" mean|inv|={values.get(p + '.mean_abs_inventory', 0)}"
+            f" edge={values.get(p + '.mean_edge_ticks', 0)}t"
+            f" adverse1s={values.get(p + '.adverse_selection_1s_ticks', 0)}t")
+    return lines
+
+
 def report(run, values: dict, verdict: dict) -> None:
     print(f"=== {run.name} ===")
     desc = run.metadata.get("description", "")
@@ -122,6 +137,12 @@ def report(run, values: dict, verdict: dict) -> None:
         for key, label in SWEEP_HEADLINE:
             if key in values:
                 print(f"    {label:<28} {values[key]}")
+
+    mm_lines = _mm_section(values)
+    if mm_lines:
+        print("\n  market makers:")
+        for line in mm_lines:
+            print(line)
 
     print("\n  participants:")
     for pid in sorted(run.participant_metrics()):
