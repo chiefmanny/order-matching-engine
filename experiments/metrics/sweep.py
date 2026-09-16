@@ -23,8 +23,9 @@ def _sweep_window(run) -> tuple[str, int, int] | None:
         return None
 
     # Identify sweep participants from the scenario, not by guessing at ids.
+    # Either registered name: `sweep` is an alias for the executor's immediate mode.
     sweep_ids = [p["id"] for p in run.metadata.get("participants", [])
-                 if p.get("strategy") == "sweep"]
+                 if p.get("strategy") in ("sweep", "parent_executor")]
     if not sweep_ids:
         return None
     pid = sweep_ids[0]

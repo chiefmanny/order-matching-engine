@@ -50,7 +50,7 @@ set(PARTICIPANT_BASE_SOURCES
     src/clients/common/strategies/directional_trader.cpp
     src/clients/common/strategies/market_maker.cpp
     src/clients/common/strategies/noise_trader.cpp
-    src/clients/common/strategies/sweep.cpp
+    src/clients/common/strategies/parent_executor.cpp
     src/clients/common/order_tracker.cpp
     src/clients/common/participant_config.cpp
     src/clients/common/position_tracker.cpp
@@ -81,7 +81,7 @@ if(EXISTS ${CMAKE_SOURCE_DIR}/tests/unit/participant_tests_main.cpp)
         tests/unit/test_directional_trader.cpp
         tests/unit/test_market_maker.cpp
         tests/unit/test_noise_trader.cpp
-        tests/unit/test_sweep.cpp
+        tests/unit/test_parent_executor.cpp
         tests/unit/test_tick_math.cpp
         tests/unit/test_order_tracker.cpp
         tests/unit/test_participant_config.cpp

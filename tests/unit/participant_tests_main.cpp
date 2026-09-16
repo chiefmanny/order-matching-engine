@@ -15,7 +15,7 @@ void run_directional_trader_tests();
 void run_market_maker_tests();
 void run_noise_trader_tests();
 void run_order_tracker_tests();
-void run_sweep_tests();
+void run_parent_executor_tests();
 void run_tick_math_tests();
 void run_participant_config_tests();
 void run_position_tracker_tests();
@@ -28,7 +28,7 @@ int main() {
     run_directional_trader_tests();
     run_market_maker_tests();
     run_noise_trader_tests();
-    run_sweep_tests();
+    run_parent_executor_tests();
     run_tick_math_tests();
     run_order_tracker_tests();
     run_participant_config_tests();

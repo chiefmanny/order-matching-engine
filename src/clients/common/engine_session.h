@@ -56,9 +56,11 @@ public:
     // --- Market data -------------------------------------------------------
     using FillCallback = std::function<void(const Fill&)>;
     using BboCallback = std::function<void(double bid, int bidSize, double ask, int askSize)>;
+    // Every trade on the symbol, ours or not -- the public tape.
+    using TapeCallback = std::function<void(double price, int size, bool aggressorIsBuy)>;
 
     // Each starts a background thread. Safe to call once each, before run.
-    void startFillStream(FillCallback cb);
+    void startFillStream(FillCallback cb, TapeCallback tapeCb = nullptr);
     void startBboStream(BboCallback cb);
 
     // Synchronous snapshot. GetLevel2 is declared as a stream but the server writes
@@ -86,7 +88,7 @@ public:
     const Counters& counters() const { return counters_; }
 
 private:
-    void runFillStream(FillCallback cb);
+    void runFillStream(FillCallback cb, TapeCallback tapeCb);
     void runBboStream(BboCallback cb);
 
     std::string symbol_;

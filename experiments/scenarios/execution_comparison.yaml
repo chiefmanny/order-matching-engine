@@ -1,0 +1,62 @@
+# Experiment — Parent-order execution styles compared.
+#
+# The same 5000-share parent, into the same deep control market, worked four
+# different ways. This is the premise of execution algorithms made measurable:
+# identical quantity, identical book, different price.
+#
+# Run the comparison with:
+#
+#   experiments/sweep.py experiments/scenarios/execution_comparison.yaml \
+#     --param participants.parent.config.mode \
+#     --values immediate,sliced,participation,passive_first \
+#     --report participant.parent.strategy.slippage_bps,\
+# participant.parent.strategy.completion_seconds,\
+# participant.parent.strategy.fill_completion,sweep.peak_impact_ticks
+#
+# The trade-off being measured is Almgren-Chriss's: trading fast pays market impact,
+# trading slowly pays timing risk. Neither is free, and which dominates depends on
+# the market, which is why this is an experiment rather than a decision.
+#
+# The limit is absolute rather than derived from maxLevels. Experiment 19 showed why:
+# a level-derived limit changes with the book, so the arms would not be running the
+# same order.
+
+extends: baselines/deep_market.yaml
+name: execution_comparison
+description: A 5000-share parent order worked four different ways.
+duration_seconds: 60
+
+engine:
+  bbo_interval_ms: 20
+recorder:
+  l2_interval_ms: 25
+
+participants:
+  - id: parent
+    strategy: parent_executor
+    start_at: 20
+    config:
+      side: BUY
+      mode: immediate
+      parentQuantity: 5000
+      limitPrice: 502.00
+      # Used by whichever mode the sweep selects; the others ignore them.
+      sliceQuantity: 500
+      sliceIntervalMs: 400
+      participationRate: 0.25
+      minSliceQuantity: 100
+      horizonSeconds: 20
+      catchupThreshold: 0.15
+      settleMs: 500
+      maxDurationMs: 30000
+
+markers:
+  - { at: 20, label: PARENT, split: true }
+
+hypothesis:
+  statement: >
+    Working the order over time rather than sending it at once lowers slippage and
+    peak impact, at the cost of a longer completion time and exposure to drift while
+    the order is still live.
+  expect:
+    - { metric: participant.parent.strategy.filled_quantity, op: ">", value: 0 }

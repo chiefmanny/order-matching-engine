@@ -21,6 +21,13 @@ struct MarketState {
     std::vector<PriceLevel> bidLevels; // from last GetLevel2 pull, best-to-worst
     std::vector<PriceLevel> askLevels;
 
+    // Whole-market traded volume since this participant connected, from the public
+    // tape rather than from our own fills. A participation-rate execution needs to
+    // size itself against what the market is doing, and "our own fills" is exactly
+    // the wrong denominator for that.
+    long long observedVolume = 0;
+    long long observedTrades = 0;
+
     std::chrono::steady_clock::time_point updatedAt;
 
     bool isValid() const {

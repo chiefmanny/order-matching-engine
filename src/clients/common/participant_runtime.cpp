@@ -106,6 +106,14 @@ int ParticipantRuntime::run() {
                             config_.parameters, std::chrono::steady_clock::now(),
                             config_.tickSize, 0.0};
         strategy_->onFill(ctx, fill);
+    },
+    // Tape callback: whole-market volume, which a participation-rate execution
+    // sizes itself against.
+    [this](double price, int size, bool) {
+        std::lock_guard<std::mutex> lock(marketMutex_);
+        market_.observedVolume += size;
+        market_.observedTrades += 1;
+        market_.lastPrice = price;
     });
 
     // --- decision loop -----------------------------------------------------

@@ -130,11 +130,12 @@ unsigned int EngineSession::replace(unsigned int orderId, double price, int size
     return submit(buy, price, size);
 }
 
-void EngineSession::startFillStream(FillCallback cb) {
-    fillThread_ = std::thread(&EngineSession::runFillStream, this, std::move(cb));
+void EngineSession::startFillStream(FillCallback cb, TapeCallback tapeCb) {
+    fillThread_ = std::thread(&EngineSession::runFillStream, this,
+                              std::move(cb), std::move(tapeCb));
 }
 
-void EngineSession::runFillStream(FillCallback cb) {
+void EngineSession::runFillStream(FillCallback cb, TapeCallback tapeCb) {
     grpc::ClientContext ctx;
     {
         std::lock_guard<std::mutex> lock(contextMutex_);
@@ -149,6 +150,9 @@ void EngineSession::runFillStream(FillCallback cb) {
     matchingengine::FillNotification notif;
     while (reader->Read(&notif)) {
         counters_.fillsSeen++;
+        // The tape first: every trade counts towards market volume regardless of
+        // whose it was.
+        if (tapeCb) tapeCb(notif.price(), notif.size(), notif.aggressor_is_buy());
 
         // Attribute by id. Both sides can be ours if a participant trades with
         // itself, so check each independently rather than else-if.

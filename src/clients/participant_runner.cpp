@@ -23,7 +23,7 @@
 #include "strategies/directional_trader.h"
 #include "strategies/market_maker.h"
 #include "strategies/noise_trader.h"
-#include "strategies/sweep.h"
+#include "strategies/parent_executor.h"
 
 #include <fstream>
 #include <functional>
@@ -43,7 +43,10 @@ const std::map<std::string, StrategyFactory>& registry() {
         {"directional_trader", [] { return std::make_unique<DirectionalTrader>(); }},
         {"market_maker", [] { return std::make_unique<MarketMaker>(); }},
         {"noise_trader", [] { return std::make_unique<NoiseTrader>(); }},
-        {"sweep", [] { return std::make_unique<Sweep>(); }},
+        {"parent_executor", [] { return std::make_unique<ParentExecutor>(); }},
+        // `sweep` is the immediate special case of a parent order, kept as an alias
+        // so Phase 6 scenarios keep working rather than being rewritten.
+        {"sweep", [] { return std::make_unique<ParentExecutor>(); }},
         // Phase 11+: parent_executor and later actors each add one line here.
     };
     return kRegistry;
