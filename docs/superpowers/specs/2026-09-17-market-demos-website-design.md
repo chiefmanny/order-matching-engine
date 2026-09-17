@@ -25,7 +25,8 @@ watching.
 
 - No live engine backend. Demos are recorded replays served as static assets.
 - No Canvas/WebGPU renderer. The existing terminal backend's ANSI output painted into
-  xterm.js is the visual, shipped as-is.
+  a `<pre>` is the visual, shipped as-is. `backend-terminal`'s existing
+  `html::ansi_to_html` does the conversion, so no terminal emulator is needed.
 - No live-parameter sliders. The no-fundamental-anchor limitation (`HANDOFF.md`
   limitation 1) means an unbounded intensity control produces a runaway, not a bigger
   version of the same market.
@@ -93,7 +94,7 @@ preset.yaml
                                     manan.com/public/finchart/pkg/  (WASM bundle)
                                                           |
                                                           v
-                        [browser]  MarketTerminal --> player.ts --> WasmChart --> xterm.js
+                        [browser]  MarketChart --> player.ts --> WasmChart --> <pre>
 ```
 
 One run produces both the recording and the evidence. This is the central property and
@@ -146,12 +147,15 @@ for a boundary with exactly one consumer.
 
 ### order-matching-engine
 
-4. **`run.py --publish-port`.** `DockerLauncher.setup` currently runs
+4. **`run.py --finchart-record` / `--finchart-bin`.** `DockerLauncher.setup` currently runs
    `docker run -d --name ... -v ...` with no `-p`; all processes share the container's
    network namespace via `docker exec`, so the engine is unreachable from the host. Add
-   an opt-in flag that appends `-p 50051:50051` for recording runs only. Normal
-   experiment runs must be unchanged. Cover it in
-   `experiments/tests/test_scenario.py`.
+   an opt-in `publish_port` that appends `-p 50051:50051` for recording runs only, and
+   have `run.py` launch the host-side adapter at the same lifecycle point where
+   `market_recorder` attaches. Launching it from `run.py` rather than from an external
+   script removes a race: participants begin trading at `start_at` (earliest 1.0s), so
+   an external poller could miss the opening of the tape. Normal experiment runs must
+   be unchanged. Cover the argv construction in `experiments/tests/test_launcher.py`.
 
 Nothing else in the engine changes. No new strategies, no matching changes, no
 recalibration.
@@ -199,10 +203,14 @@ All statically generated.
 
 | route | contents |
 |---|---|
-| `/markets` | preamble (what this is, how it was measured, what it does not model), then the seven demos listed compactly in the existing `ProjectList` idiom |
-| `/markets/[slug]` | one essay per demo |
+| `/projects/market-microstructure` | preamble (what this is, how it was measured, what it does not model), then the seven demos listed compactly in the existing `ProjectList` idiom |
+| `/projects/market-microstructure/[demo]` | one essay per demo |
 
-There is no separate methodology page. The preamble on `/markets` carries the
+These sit in the slot `manan.com/docs/architecture.md` already sanctions —
+`/projects/[slug]`, "optional flagship project pages only" — rather than introducing a
+new top-level section, so no documented routing convention is broken.
+
+There is no separate methodology page. The index preamble carries the
 hypothesis-then-verdict explanation and the honest limitations; essays affected by a
 specific limitation carry a short footer note. The two limitations that must appear:
 
@@ -238,8 +246,11 @@ export type Demo = {
 };
 ```
 
-Files live at `manan.com/content/markets/<slug>.ts`, with an index in
-`manan.com/content/markets/index.ts`.
+Files live in `manan.com/content/markets.ts`, matching the repo's one-file-per-domain
+content convention (`content/projects.ts`, `content/notes.ts`).
+
+`MarketVerdict` must carry all four values `analyze.py` emits (`analyze.py:60-66`):
+`consistent`, `partially_consistent`, `inconsistent`, `undetermined`.
 
 **Generated fields are not typed by hand.** A scaffold script reads
 `experiments/presets/manifest.json` and the run's `summary.json` and emits the content
@@ -256,11 +267,11 @@ being true.
 |---|---|
 | `src/lib/finchart/wasm.ts` | lazy WASM instantiation, single-instance guard |
 | `src/lib/finchart/player.ts` | ported from `finchart/web/main.js`: scenario fetch, event scheduling, play/pause/speed/seek, pan/zoom/follow. No React. |
-| `src/components/MarketTerminal.tsx` | client component; xterm.js lifecycle, sizing, controls, theme |
+| `src/components/MarketChart.tsx` | client component; paints `render_html` into a `<pre>`, sizing, controls |
 | `src/components/MetricTable.tsx` | hypothesis, measured values, verdict |
 
 Existing `Section.tsx` and the site's typography are reused. `projects.ts` gains a
-flagship entry pointing at `/markets`.
+flagship entry pointing at `/projects/market-microstructure`.
 
 ### Asset layout
 
@@ -292,7 +303,7 @@ HTML from SSG. The terminal is progressive enhancement.
 |---|---|
 | WASM fails to instantiate | terminal region shows a short plain message; rest of page unaffected |
 | scenario fetch fails or 404s | same |
-| xterm.js fails to initialise | same |
+| the WASM bundle fails to fetch | same |
 | recording is truncated or empty | caught before commit by scenario validation (below), never reaches the site |
 
 No error path may blank the page or throw during hydration.
@@ -309,9 +320,12 @@ strains.
 - **Keyboard.** Pan/zoom/follow are key-driven in `main.js`. Every control must also
   be reachable as a real button; key-only controls are not acceptable. The terminal
   needs an accessible name and visible focus.
-- **Theme.** The site has a `ThemeToggle`. xterm takes its palette in JS, so the
-  terminal theme must derive from the site's CSS custom properties and update on
-  toggle, or it will look broken in one mode.
+- **Theme.** The site has a `ThemeToggle` that publishes nothing through React
+  context — it only mutates `html[data-theme]`. Painting into a `<pre>` makes this a
+  non-problem: `.up` / `.down` and the chart background are ordinary CSS reading the
+  site's existing tokens, so the theme follows the toggle with no JS bridge and no
+  `MutationObserver`. This is the main reason the `<pre>` was chosen over a terminal
+  emulator.
 - **Mobile.** This is the real risk. An ANSI chart needs a minimum column count to be
   legible, and the site must work at narrow widths without overlap. Mitigate by
   reducing font size and column count first; if it still does not render usefully at
@@ -341,8 +355,8 @@ existing is not evidence it is right.
 
 ### order-matching-engine
 
-- `experiments/tests/test_scenario.py`: `--publish-port` appends the port mapping and
-  is absent by default.
+- `experiments/tests/test_launcher.py` (new): `DockerLauncher.docker_run_argv()`
+  appends the port mapping when `publish_port` is set and omits it by default.
 - Existing suites (`participant_tests`, `book_invariant_tests`, both Python suites)
   must stay green. No engine behaviour changes here, so any movement is a regression.
 
@@ -364,9 +378,9 @@ Each phase is independently verifiable and leaves the tree working.
 |---|---|---|
 | 1 | finchart proto refresh + `aggressor_is_buy` | new tests pass; `--invert-trade-side` gone |
 | 2 | adapter `--duration` / `--headless` | an unattended run produces a valid recording |
-| 3 | engine `run.py --publish-port` | the adapter records a live preset run from the host |
+| 3 | engine `run.py --finchart-record` | the adapter records a live preset run from the host |
 | 4 | record 8 scenarios, run `analyze.py` | 8 validated `.txt`, plus summary and plots per demo |
-| 5 | port player, build `MarketTerminal`, ship **one** demo | `normal-market` deployed and working in a real browser |
+| 5 | port player, build `MarketChart`, ship **one** demo | `normal-market` deployed and working in a real browser |
 | 6 | scaffold script + remaining 6 essays | all 7 pages build |
 | 7 | theme, mobile, reduced motion, accessibility | verified at 400px and in both themes |
 | 8 | homepage flagship entry in `projects.ts` | the site index points at it |
@@ -394,5 +408,7 @@ None blocking. Two to settle during implementation:
 
 - Which specific plots from each run's `plots/` directory earn a place in each essay.
   Decide in phase 4 by looking at the rendered output, not from the filenames.
-- Whether `/markets` needs its own entry in the site header or only a `projects.ts`
-  entry. Decide in phase 8 once the pages exist.
+- Whether the section needs its own entry in the site header or only a `projects.ts`
+  entry. Decide in phase 8 once the pages exist. Note that `Header`'s four nav hrefs
+  are page-relative hashes (`#projects`) that break on any non-root route, so they
+  become root-absolute (`/#projects`) regardless.
