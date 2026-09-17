@@ -26,6 +26,10 @@ from lib import artifacts, processes, scenario as scenario_mod  # noqa: E402
 
 DEFAULT_IMAGE = "ome-cpp:latest"
 DEFAULT_CONTAINER = "ome-experiment"
+# Host port for recording runs. Deliberately NOT 50051: the repo's docker-compose
+# demo stack publishes that, and a recording run would fail with "port is already
+# allocated". The container still listens on 50051; only the host side moves.
+FINCHART_HOST_PORT = 50061
 
 
 def log(message: str) -> None:
@@ -69,7 +73,7 @@ def run(args: argparse.Namespace) -> int:
     if args.backend == "docker":
         launcher = processes.DockerLauncher(
             args.image, run_dir.path, args.container, engine_args=engine_args,
-            publish_port=50051 if args.finchart_record else None)
+            publish_port=FINCHART_HOST_PORT if args.finchart_record else None)
     else:
         launcher = processes.Launcher(Path(args.bin_dir))
 
@@ -137,10 +141,16 @@ def run(args: argparse.Namespace) -> int:
             out_path.parent.mkdir(parents=True, exist_ok=True)
             fc_args = [
                 args.finchart_bin,
-                "--endpoint", "http://localhost:50051",
+                "--endpoint", f"http://localhost:{FINCHART_HOST_PORT}",
                 "--symbol", scen.symbol,
                 "--tick-size", str(scen.tick_size),
                 "--interval-secs", "1",
+                # Far finer than the adapter's 1000ms defaults. At one snapshot a
+                # second a 45s run yields ~47 book updates, which renders a coarse,
+                # steppy depth panel and heatmap. A whole preset is ~18KB at the
+                # default cadence, so resolution is effectively free here.
+                "--depth-interval-ms", "250",
+                "--heartbeat-ms", "500",
                 "--heatmap",
                 "--headless",
                 # Outlive participant teardown so the tape captures the cancellations.

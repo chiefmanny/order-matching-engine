@@ -30,18 +30,20 @@ def test_publish_port_absent_by_default() -> None:
     ok("publish port absent by default")
 
 
-def test_publish_port_maps_the_port() -> None:
-    launcher = processes.DockerLauncher("img", Path("/tmp"), "c", publish_port=50051)
+def test_publish_port_maps_host_to_the_engine_port() -> None:
+    launcher = processes.DockerLauncher("img", Path("/tmp"), "c", publish_port=50061)
     argv = launcher.docker_run_argv()
     assert "-p" in argv, argv
-    assert "50051:50051" in argv, argv
-    ok("publish port maps the port")
+    # Host side varies so a recording run cannot collide with the compose stack;
+    # the container side is always the engine's own port.
+    assert f"50061:{processes.ENGINE_PORT}" in argv, argv
+    ok("publish port maps host to the engine port")
 
 
 def test_publish_port_precedes_the_image() -> None:
     # Docker requires every option before the image name; a `-p` after it would be
     # passed to the container as an argument instead of publishing a port.
-    launcher = processes.DockerLauncher("img", Path("/tmp"), "c", publish_port=50051)
+    launcher = processes.DockerLauncher("img", Path("/tmp"), "c", publish_port=50061)
     argv = launcher.docker_run_argv()
     assert argv.index("-p") < argv.index("img"), argv
     ok("publish port precedes the image")
@@ -50,7 +52,7 @@ def test_publish_port_precedes_the_image() -> None:
 def test_engine_args_still_follow_the_image() -> None:
     launcher = processes.DockerLauncher("img", Path("/tmp"), "c",
                                         engine_args=["--symbols", "AAPL"],
-                                        publish_port=50051)
+                                        publish_port=50061)
     argv = launcher.docker_run_argv()
     assert argv.index("img") < argv.index("/app/matching_engine_server"), argv
     assert argv[-2:] == ["--symbols", "AAPL"], argv
@@ -59,7 +61,7 @@ def test_engine_args_still_follow_the_image() -> None:
 
 def main() -> int:
     test_publish_port_absent_by_default()
-    test_publish_port_maps_the_port()
+    test_publish_port_maps_host_to_the_engine_port()
     test_publish_port_precedes_the_image()
     test_engine_args_still_follow_the_image()
     print(f"\n{PASSED} passed")

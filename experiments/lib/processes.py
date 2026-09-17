@@ -102,6 +102,9 @@ class Launcher:
         return ""
 
 
+ENGINE_PORT = 50051
+
+
 class DockerLauncher(Launcher):
     """Runs the engine in a container and execs the other processes into it.
 
@@ -126,9 +129,11 @@ class DockerLauncher(Launcher):
         # Passed to the engine when the container starts, overriding its CMD. This is
         # how a scenario controls observation resolution and registered symbols.
         self.engine_args = list(engine_args or [])
-        # Published only for recording runs, where a host-side observer (the finchart
-        # adapter) has to reach the engine. Normal runs publish nothing, so two runs
-        # can never collide on the port.
+        # Host port published for recording runs, where a host-side observer (the
+        # finchart adapter) has to reach the engine. The container always listens on
+        # ENGINE_PORT; only the host side varies, so a recording run does not collide
+        # with a docker-compose stack already holding 50051. Normal runs publish
+        # nothing at all.
         self.publish_port = publish_port
         self._started = False
 
@@ -141,7 +146,7 @@ class DockerLauncher(Launcher):
         argv = ["docker", "run", "-d", "--name", self.container_name,
                 "-v", f"{self.run_dir_mount}:/run"]
         if self.publish_port is not None:
-            argv += ["-p", f"{self.publish_port}:{self.publish_port}"]
+            argv += ["-p", f"{self.publish_port}:{ENGINE_PORT}"]
         argv.append(self.image)
         if self.engine_args:
             argv += ["/app/matching_engine_server", *self.engine_args]

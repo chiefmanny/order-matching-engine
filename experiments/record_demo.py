@@ -27,9 +27,11 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 
-# A recording with fewer events than this is a capture that went wrong -- an
-# adapter that attached late, or a run that died early.
-MIN_EVENTS = 200
+# A floor for "the capture went badly wrong" -- an adapter that attached late, or a
+# run that died early. It is deliberately loose: the substantive checks are that
+# trades and depth snapshots are both present. Event counts scale with the adapter's
+# poll cadence, so a tight bound here would encode that cadence by accident.
+MIN_EVENTS = 100
 
 
 def log(message: str) -> None:
