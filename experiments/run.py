@@ -51,6 +51,10 @@ def wait_for_engine(launcher, symbol: str, timeout: float = 30.0) -> bool:
 
 
 def run(args: argparse.Namespace) -> int:
+    if args.finchart_record and not args.finchart_bin:
+        log("FAILED: --finchart-record requires --finchart-bin")
+        return 2
+
     scen = scenario_mod.load(args.scenario)
     log(f"scenario '{scen.name}' — {scen.symbol}, {scen.duration_seconds}s, "
         f"{len(scen.participants)} participant(s)")
@@ -63,8 +67,9 @@ def run(args: argparse.Namespace) -> int:
     engine_args = ["--symbols", scen.symbol,
                    "--bbo-interval-ms", str(scen.bbo_interval_ms)]
     if args.backend == "docker":
-        launcher = processes.DockerLauncher(args.image, run_dir.path, args.container,
-                                            engine_args=engine_args)
+        launcher = processes.DockerLauncher(
+            args.image, run_dir.path, args.container, engine_args=engine_args,
+            publish_port=50051 if args.finchart_record else None)
     else:
         launcher = processes.Launcher(Path(args.bin_dir))
 
@@ -77,6 +82,7 @@ def run(args: argparse.Namespace) -> int:
         log("WARNING: working tree is dirty — this run is not reproducible from the commit alone")
 
     supervisor = processes.Supervisor()
+    finchart_proc: subprocess.Popen | None = None
     failures: list[str] = []
     started_wall = time.time()
     # Phase timings, so a run that takes far longer than its window can be diagnosed
@@ -121,6 +127,38 @@ def run(args: argparse.Namespace) -> int:
                           launcher, phases)
         phase("recorder_attach")
         log("recorder attached")
+
+        # The finchart adapter is a HOST binary, so it cannot go through the launcher
+        # (which `docker exec`s into the container). It attaches here, alongside the
+        # recorder and before any participant trades; the engine's per-subscriber
+        # fan-out means both observers see the complete tape.
+        if args.finchart_record:
+            out_path = Path(args.finchart_record).resolve()
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            fc_args = [
+                args.finchart_bin,
+                "--endpoint", "http://localhost:50051",
+                "--symbol", scen.symbol,
+                "--tick-size", str(scen.tick_size),
+                "--interval-secs", "1",
+                "--heatmap",
+                "--headless",
+                # Outlive participant teardown so the tape captures the cancellations.
+                "--duration", str(int(scen.duration_seconds) + 2),
+                "--record", str(out_path),
+            ]
+            finchart_log = (run_dir.logs / "finchart.stderr").open("w")
+            finchart_proc = subprocess.Popen(fc_args, stdout=subprocess.DEVNULL,
+                                             stderr=finchart_log)
+            time.sleep(1.0)
+            if finchart_proc.poll() is not None:
+                failures.append("finchart_adapter_failed_to_start")
+                log("FAILED: finchart adapter exited immediately "
+                    f"(see {run_dir.logs / 'finchart.stderr'})")
+                finchart_proc = None
+            else:
+                log(f"finchart adapter attached -> {out_path}")
+            phase("finchart_attach")
 
         # --- timeline ------------------------------------------------------
         schedule = []
@@ -178,11 +216,12 @@ def run(args: argparse.Namespace) -> int:
         log("interrupted — stopping everything")
         failures.append("interrupted")
 
-    return finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher, phases)
+    return finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher,
+                  phases, finchart_proc)
 
 
 def finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher,
-           phases: dict | None = None) -> int:
+           phases: dict | None = None, finchart_proc=None) -> int:
     """Stop everything, gather artifacts, and judge the run."""
     # Participants first, then the recorder: it must still be listening while the
     # participants cancel their resting orders, or the tape misses the teardown.
@@ -201,6 +240,15 @@ def finish(run_dir, meta, supervisor, scen, failures, started_wall, launcher,
         began = time.monotonic()
         supervisor.stop(recorder)
         phases["stop_recorder"] = round(time.monotonic() - began, 2)
+    # It self-terminates on --duration, so this only collects it.
+    if finchart_proc is not None:
+        try:
+            finchart_proc.wait(timeout=30)
+        except subprocess.TimeoutExpired:
+            finchart_proc.kill()
+            failures.append("finchart_adapter_did_not_exit")
+            log("FAILED: finchart adapter did not exit within 30s")
+
     phases["teardown"] = round(time.monotonic() - teardown_start, 2)
     log(f"stopped ({phases['teardown']:.1f}s)")
 
@@ -373,6 +421,10 @@ def main() -> int:
     parser.add_argument("--container", default=DEFAULT_CONTAINER, help="engine container name")
     parser.add_argument("--bin-dir", default="build", help="binary directory for --backend local")
     parser.add_argument("--results-root", default=None, help="override experiments/results")
+    parser.add_argument("--finchart-record", metavar="PATH", default=None,
+                        help="also record a finchart MarketEvent stream to PATH")
+    parser.add_argument("--finchart-bin", metavar="PATH", default=None,
+                        help="path to the finchart examples-matching-engine binary")
     return run(parser.parse_args())
 
 

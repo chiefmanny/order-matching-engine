@@ -117,7 +117,8 @@ class DockerLauncher(Launcher):
     """
 
     def __init__(self, image: str, run_dir_mount: Path, container_name: str,
-                 engine_args: list[str] | None = None):
+                 engine_args: list[str] | None = None,
+                 publish_port: int | None = None):
         super().__init__(Path("/app"))
         self.image = image
         self.run_dir_mount = Path(run_dir_mount).resolve()
@@ -125,7 +126,26 @@ class DockerLauncher(Launcher):
         # Passed to the engine when the container starts, overriding its CMD. This is
         # how a scenario controls observation resolution and registered symbols.
         self.engine_args = list(engine_args or [])
+        # Published only for recording runs, where a host-side observer (the finchart
+        # adapter) has to reach the engine. Normal runs publish nothing, so two runs
+        # can never collide on the port.
+        self.publish_port = publish_port
         self._started = False
+
+    def docker_run_argv(self) -> list[str]:
+        """The `docker run` command line. Split out so ordering is testable.
+
+        Every option must precede the image name; anything after it is passed to the
+        container instead.
+        """
+        argv = ["docker", "run", "-d", "--name", self.container_name,
+                "-v", f"{self.run_dir_mount}:/run"]
+        if self.publish_port is not None:
+            argv += ["-p", f"{self.publish_port}:{self.publish_port}"]
+        argv.append(self.image)
+        if self.engine_args:
+            argv += ["/app/matching_engine_server", *self.engine_args]
+        return argv
 
     def command(self, name: str, args: list[str]) -> list[str]:
         return ["docker", "exec", self.container_name, f"/app/{name}", *args]
@@ -139,11 +159,7 @@ class DockerLauncher(Launcher):
             raise LaunchError("docker is not on PATH; use --backend local instead")
         subprocess.run(["docker", "rm", "-f", self.container_name],
                        capture_output=True, check=False)
-        argv = ["docker", "run", "-d", "--name", self.container_name,
-                "-v", f"{self.run_dir_mount}:/run", self.image]
-        if self.engine_args:
-            argv += ["/app/matching_engine_server", *self.engine_args]
-        proc = subprocess.run(argv, capture_output=True, text=True)
+        proc = subprocess.run(self.docker_run_argv(), capture_output=True, text=True)
         if proc.returncode != 0:
             raise LaunchError(f"could not start engine container: {proc.stderr.strip()}")
         self._started = True
