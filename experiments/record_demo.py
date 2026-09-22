@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import shutil
 import subprocess
 import sys
@@ -32,6 +33,24 @@ HERE = Path(__file__).resolve().parent
 # trades and depth snapshots are both present. Event counts scale with the adapter's
 # poll cadence, so a tight bound here would encode that cadence by accident.
 MIN_EVENTS = 100
+
+
+def json_safe(value):
+    """Replace non-finite floats with null, recursively.
+
+    json.dumps emits bare `NaN` and `Infinity` by default. Python reads them back
+    happily; nothing else does -- including scripts/scaffold-demo.mjs, the script
+    that exists so the site's numbers are never hand-copied. Undefined metrics are
+    real (a lifetime coefficient of variation over a single order, say), so they
+    become null rather than an unparseable token that silently breaks the consumer.
+    """
+    if isinstance(value, float) and not math.isfinite(value):
+        return None
+    if isinstance(value, dict):
+        return {k: json_safe(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [json_safe(v) for v in value]
+    return value
 
 
 def log(message: str) -> None:
@@ -174,7 +193,7 @@ def main() -> int:
         "run_dir": str(run_dir),
     }
     bundle_path = out_dir / f"{name}.demo.json"
-    bundle_path.write_text(json.dumps(bundle, indent=2) + "\n")
+    bundle_path.write_text(json.dumps(json_safe(bundle), indent=2, allow_nan=False) + "\n")
 
     log(f"OK  {recording.name}: {len(events)} events, "
         f"{bundle['trade_count']} trades, verdict={bundle['verdict']}, "
