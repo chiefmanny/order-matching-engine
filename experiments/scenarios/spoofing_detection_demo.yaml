@@ -31,7 +31,10 @@
 extends: baselines/normal_market.yaml
 name: spoofing_detection_demo
 description: Layering actor alongside genuine participants, for surveillance metrics.
-duration_seconds: 50
+# Three minutes with the layerer arriving at T+60: a clean minute of baseline for
+# the regime split, then roughly 66 layering cycles rather than 21, which gives the
+# surveillance measures far more to separate.
+duration_seconds: 180
 
 engine:
   bbo_interval_ms: 20
@@ -41,7 +44,7 @@ recorder:
 participants:
   - id: layerer
     strategy: layering_demo
-    start_at: 12
+    start_at: 60
     config:
       side: BUY
       layers: 5
@@ -55,7 +58,7 @@ participants:
       opposingSize: 200
 
 markers:
-  - { at: 12, label: LAYERING, split: true }
+  - { at: 60, label: LAYERING, split: true }
 
 hypothesis:
   statement: >

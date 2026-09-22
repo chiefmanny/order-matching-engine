@@ -24,7 +24,11 @@
 extends: baselines/deep_market.yaml
 name: execution_comparison
 description: A 5000-share parent order worked four different ways.
-duration_seconds: 60
+# Three minutes, with the parent arriving at T+70: long enough beforehand to
+# establish what the book normally looks like, and long enough afterwards to show
+# it replenishing. Both execution presets inherit this, so the two arms stay
+# directly comparable.
+duration_seconds: 180
 
 engine:
   bbo_interval_ms: 20
@@ -34,7 +38,7 @@ recorder:
 participants:
   - id: parent
     strategy: parent_executor
-    start_at: 20
+    start_at: 70
     config:
       side: BUY
       mode: immediate
@@ -51,7 +55,7 @@ participants:
       maxDurationMs: 30000
 
 markers:
-  - { at: 20, label: PARENT, split: true }
+  - { at: 70, label: PARENT, split: true }
 
 hypothesis:
   statement: >

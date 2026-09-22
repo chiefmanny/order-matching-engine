@@ -8,4 +8,4 @@ description: >
   An ordinary two-sided market. A liquidity provider maintains a multi-level book
   while background traders arrive on both sides, producing continuous execution and a
   price that moves without trending away.
-duration_seconds: 45
+duration_seconds: 180

@@ -8,3 +8,16 @@ description: >
   A market maker quotes both sides while a buyer works steadily against it. Being
   repeatedly lifted forces it short, its quotes skew to shed the position, and it is
   adversely selected: the market keeps moving against it after each fill.
+
+# Re-timed for a three-minute recording. The pressure window keeps its measured
+# magnitude -- 15 seconds of one-way buying, exactly as calibrated -- and only moves
+# later in the run, so every inventory and skew threshold upstream still holds. The
+# re-timing lives here rather than in persistent_buyer, which persistent_seller and
+# the selloff preset also inherit.
+duration_seconds: 180
+participants:
+  - id: buyer
+    start_at: 70
+    stop_at: 86
+markers:
+  - { at: 70, label: BUY PRESSURE, split: true }

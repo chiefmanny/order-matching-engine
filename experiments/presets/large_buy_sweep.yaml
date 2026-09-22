@@ -9,14 +9,17 @@ description: >
   A 10000-share buy order arrives at once. It reaches far down the ask side,
   slippage grows faster than the order size, and liquidity takes noticeably longer to
   return than after a small sweep.
-duration_seconds: 45
+# Three minutes with the sweep at T+70. The 110 seconds afterwards are the point:
+# this market has no fundamental anchor, so whether impact reverts is a question the
+# run has to be long enough to answer.
+duration_seconds: 180
 participants:
   - id: sweep1
     strategy: sweep
-    start_at: 25
+    start_at: 70
     config: { side: BUY, targetQuantity: 10000, maxLevels: 20, settleMs: 500 }
 markers:
-  - { at: 25, label: LARGE BUY SWEEP }
+  - { at: 70, label: LARGE BUY SWEEP }
 hypothesis:
   statement: A large sweep consumes multiple levels and produces substantial slippage.
   expect:

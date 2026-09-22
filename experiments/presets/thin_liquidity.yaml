@@ -8,7 +8,7 @@ description: >
   The provider shows far less size across fewer levels. Spreads are wider and more
   erratic, depth is shallow, and the same order flow moves price much more than it
   would in the normal market.
-duration_seconds: 45
+duration_seconds: 180
 participants:
   - id: lp1
     config:
