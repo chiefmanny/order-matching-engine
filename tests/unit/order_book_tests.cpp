@@ -9,6 +9,7 @@
 #include "order_book.h"
 #include "matching_algorithm.h"
 #include <stdio.h>
+#include <algorithm>
 #include <shared_mutex>
 #include <mutex>
 #include <cassert>
@@ -295,7 +296,9 @@ void randomized_orderbook_test_buy_trend() {
         std::uniform_int_distribution<unsigned int> size_dist(1, 1000);
 
         // Adjust the ratio of buy to sell orders
-        unsigned int buyCount = static_cast<unsigned int>(count * buyRatio);
+        // Capped at 100%: above that, count - buyCount wraps around and the
+        // sell loop below would try to add about 4.3 billion orders.
+        unsigned int buyCount = static_cast<unsigned int>(count * std::min(buyRatio, 1.0));
         unsigned int sellCount = count - buyCount;
 
         // Add buy orders
