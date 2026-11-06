@@ -8,7 +8,7 @@ Spans three repositories:
 - `finchart` — the charting engine, its matching-engine gRPC adapter, and its WASM web showcase
 - `manan.com` — the Next.js personal site
 
-Read `HANDOFF.md` first for the state of this repo.
+Read `docs/HANDOFF.md` first for the state of this repo.
 
 ---
 
@@ -27,7 +27,7 @@ watching.
 - No Canvas/WebGPU renderer. The existing terminal backend's ANSI output painted into
   a `<pre>` is the visual, shipped as-is. `backend-terminal`'s existing
   `html::ansi_to_html` does the conversion, so no terminal emulator is needed.
-- No live-parameter sliders. The no-fundamental-anchor limitation (`HANDOFF.md`
+- No live-parameter sliders. The no-fundamental-anchor limitation (`docs/HANDOFF.md`
   limitation 1) means an unbounded intensity control produces a runaway, not a bigger
   version of the same market.
 - No new participant strategies, no engine matching changes, no recalibration of the
@@ -38,7 +38,7 @@ watching.
 ## Why this is possible now
 
 Three properties of the current code make the design work, and each was a fix made
-during the 13-phase effort described in `HANDOFF.md`:
+during the 13-phase effort described in `docs/HANDOFF.md`:
 
 1. **Per-subscriber fan-out.** `Subscribe` used to pop a single shared queue, so two
    subscribers split the trade tape. It now fans out per subscriber, which is what
@@ -177,7 +177,7 @@ recalibration.
 Eight recordings, seven essays: `execution-styles` embeds both recordings and compares
 them.
 
-`spoofing-detection` must carry the finding from `HANDOFF.md` limitation 7 — that a
+`spoofing-detection` must carry the finding from `docs/HANDOFF.md` limitation 7 — that a
 naive cancel-ratio-plus-order-to-trade score ranks the *honest* liquidity provider as
 more anomalous than the layering actor, because continuous quoting means continuous
 requoting. That false positive is the scenario's actual lesson and the most
@@ -189,7 +189,7 @@ The three presets not used remain in the repo and are unaffected:
 - `buy_sweep` and `selloff` are smaller or opposite-signed versions of the idea
   `price-impact` already covers with `large_buy_sweep`.
 - `volatility_shock` is too variable run to run to anchor an essay on a single
-  recording. `HANDOFF.md` records its realised vol ratio as 7.9 +/- 5.7. It becomes a
+  recording. `docs/HANDOFF.md` records its realised vol ratio as 7.9 +/- 5.7. It becomes a
   candidate once it has been re-verified with `sweep.py --repeat` and its thresholds
   derived from the distribution.
 
@@ -349,7 +349,7 @@ committed `.txt` is validated by replaying it and asserting a non-trivial render
 frame and a plausible event count.
 
 This is the gate that stops a truncated or silently empty recording reaching the site.
-It exists because of a lesson already recorded in `HANDOFF.md`: the Level 2 heatmap
+It exists because of a lesson already recorded in `docs/HANDOFF.md`: the Level 2 heatmap
 once rendered a plausible image with axes, a colourbar and no data at all. An artifact
 existing is not evidence it is right.
 

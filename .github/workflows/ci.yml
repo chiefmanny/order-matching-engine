@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake nlohmann-json3-dev
+
+      # These targets need no gRPC, so CI stays fast.
+      - name: Build
+        run: |
+          cmake -B build
+          cmake --build build -j"$(nproc)" --target participant_tests book_invariant_tests
+
+      - name: Run participant tests
+        run: ./build/participant_tests
+
+      - name: Run order book invariant tests
+        run: ./build/book_invariant_tests
