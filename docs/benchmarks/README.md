@@ -19,6 +19,8 @@ All three use the same client test programs. The 2024 sources are unmodified: `b
 - **Toolchain:** Debian bookworm, g++ 12.2, gRPC 1.51.1, protobuf 3.21.12, CMake `Release`
 - **Date:** November 6, 2026, 10:17-10:42 local time. The power log shows no sleep or wake events in that window.
 
+The demo web app's three containers were also idling on the same Docker VM, using about 2% of one core in total.
+
 Client and server run in the same container and talk over localhost. Treat the absolute numbers as specific to this setup. The comparison between versions is what matters.
 
 ## What each test measures
