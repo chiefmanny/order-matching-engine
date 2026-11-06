@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 COPY sources/ /sources/
-COPY build_version.sh run_benchmarks.sh /usr/local/bin/
+COPY build_version.sh run_benchmarks.sh asan_repro.sh /usr/local/bin/
 RUN for v in coarse fine current; do build_version.sh "$v"; done
 
 CMD ["run_benchmarks.sh"]
