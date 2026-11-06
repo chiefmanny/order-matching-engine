@@ -1,7 +1,7 @@
 #!/bin/bash
 # Runs inside the container. Builds each version with AddressSanitizer and puts
-# it under the throughput test's load. Saves the first report from each failing
-# run, because a dying server repeats its report across threads.
+# it under the throughput test's load. Saves one report from the first run that
+# fails for each version.
 set -u
 
 out=/results/asan
@@ -37,7 +37,9 @@ for version in fine coarse current; do
         kind=$(grep -m1 -o 'AddressSanitizer: [a-z-]*' "$report" | cut -d' ' -f2)
         echo "$version,$run,$size,$client_errors,$state,${kind:-none}" >> "$out/summary.csv"
         if [ -s "$report" ] && [ ! -f "$out/${version}_report.txt" ]; then
-            sed -n '1,/^SUMMARY/p' "$report" > "$out/${version}_report.txt"
+            # Keep the three stacks. The rest lists every thread's creation history.
+            { awk '/^=====/ { p = 1 } /^Thread T/ && p { exit } p { print }' "$report"
+              grep -m1 '^SUMMARY' "$report"; } > "$out/${version}_report.txt"
         fi
     done
 done

@@ -54,3 +54,6 @@ experiments/results/
 *pb2*.py
 
 cmake_install.cmake
+# Benchmark results are evidence for the README, so they stay tracked
+!docs/benchmarks/results/**/*.csv
+!docs/benchmarks/results/*.csv

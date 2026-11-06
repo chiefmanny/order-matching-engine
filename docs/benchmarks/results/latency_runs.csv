@@ -1,0 +1,10 @@
+Version,Run,Client Errors,Server
+coarse,1,0,alive
+coarse,2,0,alive
+coarse,3,0,alive
+fine,1,0,alive
+fine,2,0,alive
+fine,3,0,alive
+current,1,0,alive
+current,2,0,alive
+current,3,0,alive

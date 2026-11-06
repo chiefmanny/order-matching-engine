@@ -1,0 +1,10 @@
+Version,Run,Size,Client Errors,Server,Sanitizer Report
+fine,1,51200,91610,exit:1,heap-use-after-free
+fine,2,51200,89505,exit:1,heap-use-after-free
+fine,3,51200,75043,exit:1,heap-use-after-free
+coarse,1,51200,0,alive,none
+coarse,2,51200,0,alive,none
+coarse,3,51200,0,alive,none
+current,1,51200,0,alive,none
+current,2,51200,0,alive,none
+current,3,51200,0,alive,none
