@@ -70,11 +70,11 @@ Median latency to acknowledge one order was 96-97 µs on all three. The largest 
 
 ### Why it crashed
 
-[`addLimitOrder`](https://github.com/chiefmanny/order-matching-engine/blob/fine-grained-2024/order_book.cpp#L28-L48) finds the price level, lets go of the tree lock, and only then locks the level. Simplified:
+[`addLimitOrder`](https://github.com/chiefmanny/order-matching-engine/blob/fine-grained-2024/order_book.cpp#L56-L75) finds the price level, lets go of the tree lock, and only then locks the level. Simplified:
 
 ```cpp
 {
-    std::shared_lock<std::shared_mutex> sharedLock(bidMutex);
+    std::shared_lock<std::shared_mutex> sharedLock(askMutex);
     limitPrice = &it->second;                  // pointer into the map
 }                                              // tree lock released here
                                                // <-- the matcher can erase the level here
@@ -82,7 +82,7 @@ std::lock_guard<std::mutex> lock(limitPrice->mtx);
 limitPrice->orders.push_back(addOrder);        // use-after-free
 ```
 
-If the matcher [empties and erases that level](https://github.com/chiefmanny/order-matching-engine/blob/fine-grained-2024/matching_algorithm.cpp#L111-L115) during that gap, the writer is using freed memory. AddressSanitizer caught this in 3 of 3 runs, and [the report](docs/benchmarks/results/asan/fine_report.txt) shows the free and the bad access in those spots. Coarse and current came back clean under the same load.
+If the matcher [empties and erases that level](https://github.com/chiefmanny/order-matching-engine/blob/fine-grained-2024/matching_algorithm.cpp#L103-L107) during that gap, the writer is using freed memory. AddressSanitizer caught this in 3 of 3 runs, and [the report](docs/benchmarks/results/asan/fine_report.txt) shows the free and the bad access in those spots, on the ask side. The bid side has the same code. Coarse and current came back clean under the same load.
 
 I hit crashes on this branch back in 2024 and fixed several of them (see [earlier debugging](#earlier-debugging)). This one is a separate bug in the add path. It was still there in 2026, when the benchmarks and AddressSanitizer runs caught it.
 
@@ -245,8 +245,8 @@ manipulative actor from the others, and which ones are misleading.
 
 The first anomaly score written for it ranked the liquidity provider as more anomalous
 than the layering actor. The provider cancels 99.9% of its orders, because quoting
-continuously means requoting continuously. That false positive is written up in the
-scenario file.
+continuously means requoting continuously. That false positive is written up in
+`experiments/metrics/manipulation.py`.
 
 It only runs against this synthetic engine and simulated participants.
 
